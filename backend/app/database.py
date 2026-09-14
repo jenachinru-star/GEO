@@ -64,3 +64,20 @@ def init_db():
             if 'generated_at' not in cols:
                 conn.execute(text("ALTER TABLE geo_semantic ADD COLUMN generated_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
         conn.commit()
+
+    # 迁移：geo_doctor_profile 加个人品牌字段（幂等）
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(geo_doctor_profile)"))]
+        if cols:
+            doctor_brand_cols = {
+                'avatar_url': "TEXT DEFAULT ''",
+                'bio': "TEXT DEFAULT ''",
+                'social_links': "TEXT DEFAULT '[]'",
+                'personal_website': "TEXT DEFAULT ''",
+                'registration_url': "TEXT DEFAULT ''",
+                'clinic_hours': "TEXT DEFAULT '[]'",
+            }
+            for col, col_def in doctor_brand_cols.items():
+                if col not in cols:
+                    conn.execute(text(f"ALTER TABLE geo_doctor_profile ADD COLUMN {col} {col_def}"))
+        conn.commit()
