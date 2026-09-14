@@ -33,16 +33,16 @@ def iam_callback(code: str = None, state: str = None, error: str = None,
     # 用户拒绝授权或配置错误
     if error:
         error_msg = error_description or error
-        return RedirectResponse(url=f"http://localhost:3000/sso?error={error_msg}")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso?error={error_msg}")
 
     if not code or not state:
-        return RedirectResponse(url="http://localhost:3000/sso?error=缺少授权参数")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso?error=缺少授权参数")
 
     iam = IAMService(db)
     jwt_token, error_msg = iam.handle_callback(code, state)
 
     if error_msg:
-        return RedirectResponse(url=f"http://localhost:3000/sso?error={error_msg}")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso?error={error_msg}")
 
     # 生成一次性ticket，60秒过期
     ticket = secrets.token_hex(16)
@@ -52,7 +52,7 @@ def iam_callback(code: str = None, state: str = None, error: str = None,
     }
 
     # 重定向到前端回调落地页
-    return RedirectResponse(url=f"http://localhost:3000/sso?ticket={ticket}")
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/sso?ticket={ticket}")
 
 
 @router.post("/iam/exchange", summary="用ticket换取JWT")

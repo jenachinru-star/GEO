@@ -1,12 +1,15 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional
+import json
 
 from app.database import get_db
 from app.deps import get_current_user_id
 from app.schemas import *
 from app.services import MonitorService
 from app.models import Question
+from app.models.task import AsyncTask
+from app.models.workspace import WorkspaceMember
 
 router = APIRouter(prefix="/api/v1/monitor", tags=["监测中心"])
 
@@ -98,8 +101,41 @@ def get_trend(
     return {"code": 0, "message": "success", "data": result}
 
 
-@router.post("/collect", summary="触发采集")
+@router.post("/collect", summary="触发采集（异步任务，立即返回task_id）")
 def trigger_collect(data: CollectRequest, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    service = MonitorService(db)
-    result = service.trigger_collect(data.question_id)
-    return {"code": 0, "message": "success", "data": result}
+    """触发采集（异步，由Worker执行）"""
+    # 获取用户默认 workspace_id
+    ws_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.user_id == user_id,
+        WorkspaceMember.role == "owner"
+    ).first()
+    workspace_id = ws_member.workspace_id if ws_member else None
+
+    # 检查是否已有 running 的同类型任务（防止重复提交）
+    running_task = db.query(AsyncTask).filter(
+        AsyncTask.created_by == user_id,
+        AsyncTask.task_type == "monitor_collect",
+        AsyncTask.status.in_(["queued", "running"])
+    ).first()
+    if running_task:
+        raise HTTPException(status_code=400, detail=f"已有正在执行的采集任务（ID: {running_task.id}），请等待完成")
+
+    # 创建异步任务
+    task = AsyncTask(
+        workspace_id=workspace_id,
+        task_type="monitor_collect",
+        status="queued",
+        progress=0,
+        progress_message="等待执行",
+        payload_json=json.dumps({"question_id": data.question_id, "detect_round": data.detect_round}, ensure_ascii=False),
+        created_by=user_id,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    return {"code": 0, "message": "任务已创建", "data": {
+        "task_id": task.id,
+        "status": "queued",
+        "message": "采集任务已提交，Worker将在后台执行"
+    }}

@@ -15,6 +15,9 @@ from app.api.entity import router as entity_router
 from app.api.tools import router as tools_router
 from app.api.template import router as template_router
 from app.api.distribution import router as distribution_router
+from app.api.task import router as task_router
+from app.api.opportunity import router as opportunity_router
+from app.api.image import router as image_router
 
 __all__ = [
     "monitor_router",
@@ -34,4 +37,7 @@ __all__ = [
     "tools_router",
     "template_router",
     "distribution_router",
+    "task_router",
+    "opportunity_router",
+    "image_router",
 ]

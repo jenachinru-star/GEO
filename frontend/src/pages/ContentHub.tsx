@@ -1,16 +1,42 @@
 import { useEffect, useState } from 'react'
 import {
-  Row, Col, Table, Tag, Button, Space, Input, Select,
-  Modal, Form, Drawer, message, Popconfirm, Statistic
+  Row, Col, Button, Select, Modal, Form, Input,
+  message, Space, Tag, Empty, Typography, Table,
+  Drawer, Popconfirm, Statistic, Tabs, Badge
 } from 'antd'
 import {
-  PlusOutlined, ReloadOutlined, DeleteOutlined,
-  EyeOutlined, EditOutlined, CheckCircleOutlined, WarningOutlined
+  FileTextOutlined, VideoCameraOutlined, PlusOutlined,
+  CheckCircleOutlined, WarningOutlined, ReloadOutlined,
+  DeleteOutlined, EyeOutlined, EditOutlined,
+  ThunderboltOutlined, BlockOutlined
 } from '@ant-design/icons'
-import { articleApi, semanticApi, distributionApi } from '@/api'
+import { semanticApi, articleApi, toolsApi, templateApi, distributionApi, opportunityApi } from '@/api'
 import { PUBLISH_PLATFORMS, PUBLISH_PLATFORM_NAMES, ARTICLE_STATUS_NAMES } from '@/store/useStore'
 
-const Content = () => {
+const { Title, Text } = Typography
+
+const OPPORTUNITY_TYPE_NAMES: Record<string, string> = {
+  missing_mention: 'AI未提及',
+  missing_citation: '缺少引用',
+  low_rank: '排名靠后',
+}
+
+const OPPORTUNITY_TYPE_COLORS: Record<string, string> = {
+  missing_mention: 'red',
+  missing_citation: 'orange',
+  low_rank: 'blue',
+}
+
+const ContentHub = () => {
+  // ========== 创作工作台 state（来自 Create.tsx）==========
+  const [semantics, setSemantics] = useState<any[]>([])
+  const [selectedSemantic, setSelectedSemantic] = useState<number | null>(null)
+  const [selectedPlatform, setSelectedPlatform] = useState<string>('wechat')
+  const [toolConfig, setToolConfig] = useState<any>(null)
+  const [templateData, setTemplateData] = useState<any>(null)
+  const [templateLoading, setTemplateLoading] = useState(false)
+
+  // ========== 文章管理 state（来自 Content.tsx）==========
   const [list, setList] = useState<any[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -23,15 +49,28 @@ const Content = () => {
   const [form] = Form.useForm()
   const [filters, setFilters] = useState({ semantic_id: '' as number | '', status: '' as string, keyword: '' })
   const [page, setPage] = useState(1)
-  const [semantics, setSemantics] = useState<any[]>([])
   const [stats, setStats] = useState({ total: 0, published: 0, consistent: 0 })
   const [distributions, setDistributions] = useState<any[]>([])
   const [distForm] = Form.useForm()
 
+  // ========== 内容机会 state ==========
+  const [opportunities, setOpportunities] = useState<any[]>([])
+  const [oppLoading, setOppLoading] = useState(false)
+  const [oppScanning, setOppScanning] = useState(false)
+  const [activeTab, setActiveTab] = useState('create')
+
+  // ========== 数据加载 ==========
   const loadSemantics = async () => {
     try {
       const res: any = await semanticApi.getList({ page_size: 100 })
       setSemantics(res.data.items || res.data || [])
+    } catch (e) {}
+  }
+
+  const loadTools = async () => {
+    try {
+      const res: any = await toolsApi.getConfig()
+      setToolConfig(res.data)
     } catch (e) {}
   }
 
@@ -48,7 +87,6 @@ const Content = () => {
       }
       setList(items)
       setTotal(res.data.total || items.length)
-      // 统计
       setStats({
         total: res.data.total || 0,
         published: items.filter((a: any) => a.status === 'published').length,
@@ -61,16 +99,73 @@ const Content = () => {
 
   useEffect(() => {
     loadSemantics()
+    loadTools()
+    loadOpportunities()
   }, [])
 
   useEffect(() => {
     loadData()
   }, [filters, page])
 
+  // ========== 创作工作台函数（来自 Create.tsx）==========
+  const handleGenerateArticle = () => {
+    if (!selectedSemantic) {
+      message.warning('请先选择语义问题')
+      return
+    }
+    const semantic = semantics.find(s => s.id === selectedSemantic)
+    const url = toolConfig?.article_tool_url || 'https://ops.szcczh.com/paper-next/'
+    const params = new URLSearchParams()
+    if (semantic) params.set('semantic_question', semantic.question)
+    params.set('publish_platform', selectedPlatform)
+    const fullUrl = `${url}?${params.toString()}`
+    window.open(fullUrl, '_blank')
+    message.info('已打开文章生成工具，生成后请回到此页记录文章')
+  }
+
+  const handleGenerateVideo = () => {
+    if (!selectedSemantic) {
+      message.warning('请先选择语义问题')
+      return
+    }
+    const semantic = semantics.find(s => s.id === selectedSemantic)
+    const url = toolConfig?.video_tool_url || 'https://video.szcczh.com/'
+    const params = new URLSearchParams()
+    if (semantic) params.set('semantic_question', semantic.question)
+    const fullUrl = `${url}?${params.toString()}`
+    window.open(fullUrl, '_blank')
+    message.info('已打开视频生成工具')
+  }
+
+  const handleGenerateTemplate = async () => {
+    if (!selectedSemantic) {
+      message.warning('请先选择语义问题')
+      return
+    }
+    setTemplateLoading(true)
+    try {
+      const res: any = await templateApi.generateArticle(selectedSemantic)
+      setTemplateData(res.data)
+    } finally {
+      setTemplateLoading(false)
+    }
+  }
+
+  const handleCopyTemplate = () => {
+    if (!templateData) return
+    navigator.clipboard.writeText(templateData.full_text)
+    message.success('模板已复制到剪贴板，可粘贴到文章工具中使用')
+  }
+
+  // ========== 文章管理函数（来自 Content.tsx）==========
   const handleAdd = () => {
     setEditMode(false)
     setEditId(null)
     form.resetFields()
+    // 从创作工作台添加时，预填当前选中语义
+    if (selectedSemantic) {
+      form.setFieldsValue({ semantic_id: selectedSemantic })
+    }
     setModalVisible(true)
   }
 
@@ -148,6 +243,52 @@ const Content = () => {
     } catch (e) {}
   }
 
+  // ========== 内容机会函数 ==========
+  const loadOpportunities = async () => {
+    setOppLoading(true)
+    try {
+      const res: any = await opportunityApi.list({ status: 'open' })
+      setOpportunities(res.data.items || [])
+    } catch (e) {} finally {
+      setOppLoading(false)
+    }
+  }
+
+  const handleScanOpportunities = async () => {
+    setOppScanning(true)
+    try {
+      const res: any = await opportunityApi.scan()
+      message.success(`扫描完成，新增 ${res.data.new} 个内容机会`)
+      loadOpportunities()
+    } catch (e) {} finally {
+      setOppScanning(false)
+    }
+  }
+
+  const handleDismissOpportunity = async (id: number) => {
+    try {
+      await opportunityApi.dismiss(id)
+      message.success('已忽略该机会')
+      loadOpportunities()
+    } catch (e) {}
+  }
+
+  const handleGenerateFromOpportunity = async (opp: any) => {
+    // 选中对应语义并生成文章模板
+    setSelectedSemantic(opp.question_id)
+    setTemplateLoading(true)
+    try {
+      const res: any = await templateApi.generateArticle(opp.question_id, opp.id)
+      setTemplateData(res.data)
+      message.success(`已基于内容机会生成文章（来源：${res.data.source === 'llm' ? 'LLM' : '模板'}）`)
+      // 切换到内容创作Tab
+      setActiveTab('create')
+    } catch (e) {} finally {
+      setTemplateLoading(false)
+    }
+  }
+
+  // ========== 文章表格列（来自 Content.tsx）==========
   const columns = [
     {
       title: '标题', dataIndex: 'title', key: 'title',
@@ -185,7 +326,7 @@ const Content = () => {
       render: (t: string) => new Date(t).toLocaleDateString()
     },
     {
-      title: '操作', key: 'action', width: 180,
+      title: '操作', key: 'action', width: 240,
       render: (_: any, record: any) => (
         <Space size="small">
           <Button type="link" size="small" icon={<EyeOutlined />} onClick={() => handleView(record)}>查看</Button>
@@ -199,18 +340,173 @@ const Content = () => {
     }
   ]
 
+  // 创作工作台：选中语义的数据
+  const selectedSemanticData = semantics.find(s => s.id === selectedSemantic)
+
   return (
     <div>
+      {/* ===== 页面标题栏 ===== */}
       <div className="page-title-bar">
         <div>
-          <h2>我的文章</h2>
-          <div className="page-desc">管理所有语义下产出的文章，追踪实体一致性</div>
+          <h2>内容中心</h2>
+          <div className="page-desc">选择语义创作内容，管理所有产出文章</div>
         </div>
         <Space>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleAdd} className="btn-primary-gradient">添加文章</Button>
           <Button icon={<ReloadOutlined />} onClick={loadData}>刷新</Button>
         </Space>
       </div>
+
+      <Tabs
+        activeKey={activeTab}
+        onChange={setActiveTab}
+        items={[
+          {
+            key: 'create',
+            label: '内容创作',
+            children: (
+              <>
+      {/* ===== 【创作工作台】来自 Create.tsx ===== */}
+      {/* 语义选择 */}
+      <div className="geo-card" style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>🎨 创作工作台</div>
+        <Space direction="vertical" style={{ width: '100%' }}>
+          <Text strong style={{ fontSize: 14 }}>第一步：选择语义问题</Text>
+          <Select
+            placeholder="请选择要创作的语义问题"
+            style={{ width: '100%' }}
+            value={selectedSemantic || undefined}
+            onChange={setSelectedSemantic}
+            showSearch
+            optionFilterProp="label"
+            options={semantics.map(s => ({ value: s.id, label: s.question }))}
+          />
+          {selectedSemanticData && (
+            <div style={{ background: '#EFF6FF', padding: '10px 14px', borderRadius: 8 }}>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                当前语义：{selectedSemanticData.question}
+                （GEO率 {selectedSemanticData.geo_rate}% / AEO率 {selectedSemanticData.aeo_rate}% /
+                已产出 {selectedSemanticData.article_count} 篇文章）
+              </Text>
+            </div>
+          )}
+        </Space>
+      </div>
+
+      {/* 工具卡片 */}
+      <Row gutter={16} style={{ marginBottom: 20 }}>
+        <Col xs={24} md={12}>
+          <div className="geo-card" style={{ height: '100%', borderLeft: '3px solid var(--primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <FileTextOutlined style={{ fontSize: 28, color: 'var(--primary)', marginRight: 12 }} />
+              <div>
+                <Title level={4} style={{ margin: 0 }}>生成文章</Title>
+                <Text type="secondary">问答式结构，AEO问句式标题</Text>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>发布平台：</Text>
+              <Select
+                value={selectedPlatform}
+                onChange={setSelectedPlatform}
+                style={{ width: 240, marginLeft: 8 }}
+                optionFilterProp="label"
+              >
+                {[1, 2, 3].map(tier => (
+                  <Select.OptGroup key={tier} label={tier === 1 ? '🔥 AI高优先抓取平台' : tier === 2 ? '🏥 医疗权威平台' : '📢 补充收录平台'}>
+                    {PUBLISH_PLATFORMS.filter(p => p.tier === tier).map(p => (
+                      <Select.Option key={p.code} value={p.code} label={p.name}>
+                        <span>{p.name}</span>
+                        <span style={{ color: '#999', fontSize: 12, marginLeft: 8 }}>{p.tierLabel}</span>
+                      </Select.Option>
+                    ))}
+                  </Select.OptGroup>
+                ))}
+              </Select>
+              {selectedPlatform && (() => {
+                const p = PUBLISH_PLATFORMS.find(x => x.code === selectedPlatform)
+                if (!p) return null
+                return (
+                  <div style={{ background: '#FFFBEB', padding: '10px 14px', borderRadius: 8, marginTop: 8, fontSize: 12 }}>
+                    <div style={{ color: '#92400E', marginBottom: 4 }}>💡 AI抓取价值：{p.aiValue}</div>
+                    <div style={{ color: '#92400E' }}>⚠️ 平台规则：{p.rules.join('；')}</div>
+                  </div>
+                )
+              })()}
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              block
+              icon={<FileTextOutlined />}
+              onClick={handleGenerateArticle}
+              className="btn-primary-gradient"
+            >
+              打开文章工具
+            </Button>
+          </div>
+        </Col>
+        <Col xs={24} md={12}>
+          <div className="geo-card" style={{ height: '100%', borderLeft: '3px solid var(--purple)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <VideoCameraOutlined style={{ fontSize: 28, color: 'var(--purple)', marginRight: 12 }} />
+              <div>
+                <Title level={4} style={{ margin: 0 }}>生成视频</Title>
+                <Text type="secondary">口播/动画视频，多平台适配</Text>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16, height: 32 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>基于当前语义问题生成视频内容</Text>
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              block
+              icon={<VideoCameraOutlined />}
+              onClick={handleGenerateVideo}
+              style={{ background: 'var(--purple-gradient)', border: 'none', boxShadow: '0 4px 16px rgba(139,92,246,0.25)' }}
+            >
+              打开视频工具
+            </Button>
+          </div>
+        </Col>
+      </Row>
+
+      {/* GEO文章模板 */}
+      {selectedSemantic && (
+        <div className="geo-card" style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <Title level={5} style={{ margin: 0, color: '#1D4ED8' }}>📝 GEO/AEO 文章模板</Title>
+            <Space>
+              <Button onClick={handleGenerateTemplate} loading={templateLoading}>
+                {templateData ? '重新生成' : '生成模板'}
+              </Button>
+              {templateData && (
+                <Button type="primary" onClick={handleCopyTemplate} className="btn-primary-gradient">一键复制</Button>
+              )}
+            </Space>
+          </div>
+          {templateData ? (
+            <div style={{ background: '#F8FAFC', padding: 16, borderRadius: 12, fontSize: 13, lineHeight: 1.8 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: '#1D4ED8' }}>【标题】{templateData.title}</div>
+              <div style={{ marginBottom: 8 }}><strong>【首段】</strong>{templateData.intro}</div>
+              <div style={{ marginBottom: 8, whiteSpace: 'pre-wrap' }}><strong>【正文】</strong>{templateData.body}</div>
+              <div style={{ marginBottom: 8 }}><strong>【文末】</strong>{templateData.conclusion}</div>
+              <div style={{ color: '#6B7280' }}>
+                <strong>【标签】</strong>
+                {templateData.tags.map((t: string, i: number) => (
+                  <span key={i} className="geo-tag geo-tag-blue" style={{ marginRight: 6 }}>{t}</span>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <Empty description="选择语义后点击生成模板，自动填充医生信息和标准结构" />
+          )}
+        </div>
+      )}
+
+      {/* ===== 【文章管理】来自 Content.tsx ===== */}
+      <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>📚 文章管理</div>
 
       {/* 统计卡片 */}
       <Row gutter={16} style={{ marginBottom: 20 }}>
@@ -265,7 +561,7 @@ const Content = () => {
         </Space>
       </div>
 
-      {/* 列表 */}
+      {/* 文章列表 */}
       <div className="geo-card">
         <Table
           dataSource={list}
@@ -279,11 +575,86 @@ const Content = () => {
             onChange: setPage,
             showTotal: (t) => `共 ${t} 条`
           }}
-          locale={{ emptyText: '暂无文章，去创作中心生成吧' }}
+          locale={{ emptyText: '暂无文章，去上方创作工作台生成吧' }}
         />
       </div>
+              </>
+            ),
+          },
+          {
+            key: 'opportunity',
+            label: <Badge count={opportunities.length} size="small" offset={[8, 0]}>内容机会</Badge>,
+            children: (
+              <>
+      {/* ===== 内容机会 ===== */}
+      <div className="geo-card" style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div>
+            <Title level={5} style={{ margin: 0 }}>内容机会识别</Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>基于监测数据自动识别 GEO 优化机会，一键生成定向文章</Text>
+          </div>
+          <Space>
+            <Button icon={<ReloadOutlined />} onClick={loadOpportunities} loading={oppLoading}>刷新</Button>
+            <Button type="primary" icon={<ThunderboltOutlined />} onClick={handleScanOpportunities} loading={oppScanning} className="btn-primary-gradient">
+              扫描机会
+            </Button>
+          </Space>
+        </div>
+        <Table
+          dataSource={opportunities}
+          rowKey="id"
+          loading={oppLoading}
+          pagination={false}
+          locale={{ emptyText: <Empty description={'暂无内容机会，点击「扫描机会」开始识别'} /> }}
+          columns={[
+            {
+              title: '机会类型', dataIndex: 'opportunity_type', width: 120,
+              render: (t: string) => <Tag color={OPPORTUNITY_TYPE_COLORS[t] || 'default'}>{OPPORTUNITY_TYPE_NAMES[t] || t}</Tag>,
+            },
+            {
+              title: '关联语义', dataIndex: 'question_text', key: 'question_text', ellipsis: true,
+            },
+            {
+              title: '优先级', dataIndex: 'priority_score', width: 100,
+              render: (s: number) => (
+                <span style={{ fontWeight: 600, color: s >= 70 ? '#EF4444' : s >= 50 ? '#F59E0B' : '#6B7280' }}>
+                  {s?.toFixed(0)}分
+                </span>
+              ),
+            },
+            {
+              title: '证据', dataIndex: 'evidence', width: 200, ellipsis: true,
+              render: (ev: any) => {
+                if (!ev) return '-'
+                if (ev.mention_rate !== undefined) return `提及率 ${ev.mention_rate}% (${ev.mentioned_count}/${ev.total_count})`
+                if (ev.avg_rank !== undefined) return `平均排名 ${ev.avg_rank}`
+                if (ev.citation_rate !== undefined) return `引用率 ${ev.citation_rate}%`
+                return JSON.stringify(ev)
+              },
+            },
+            {
+              title: '操作', width: 180,
+              render: (_: any, record: any) => (
+                <Space size="small">
+                  <Button type="primary" size="small" icon={<FileTextOutlined />} onClick={() => handleGenerateFromOpportunity(record)} className="btn-primary-gradient">
+                    生成文章
+                  </Button>
+                  <Popconfirm title="忽略该机会？" onConfirm={() => handleDismissOpportunity(record.id)}>
+                    <Button size="small" icon={<BlockOutlined />}>忽略</Button>
+                  </Popconfirm>
+                </Space>
+              ),
+            },
+          ]}
+        />
+      </div>
+              </>
+            ),
+          },
+        ]}
+      />
 
-      {/* 添加/编辑弹窗 */}
+      {/* ===== 添加/编辑文章弹窗（来自 Content.tsx） ===== */}
       <Modal
         title={editMode ? '编辑文章' : '添加文章'}
         open={modalVisible}
@@ -335,7 +706,7 @@ const Content = () => {
         </Form>
       </Modal>
 
-      {/* 详情抽屉 */}
+      {/* ===== 文章详情抽屉（来自 Content.tsx） ===== */}
       <Drawer
         title="文章详情"
         placement="right"
@@ -462,4 +833,4 @@ const Content = () => {
   )
 }
 
-export default Content
+export default ContentHub

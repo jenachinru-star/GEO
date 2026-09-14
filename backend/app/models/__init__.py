@@ -10,6 +10,11 @@ from app.models.semantic import Semantic
 from app.models.article import ArticleDraft
 from app.models.subscription import Subscription
 
+# ===== V2 新增模型 =====
+from app.models.workspace import Workspace, WorkspaceMember
+from app.models.task import AsyncTask
+from app.models.content_opportunity import ContentOpportunity
+
 __all__ = [
     "Platform",
     "Question",
@@ -23,4 +28,8 @@ __all__ = [
     "Semantic",
     "ArticleDraft",
     "Subscription",
+    "Workspace",
+    "WorkspaceMember",
+    "AsyncTask",
+    "ContentOpportunity",
 ]

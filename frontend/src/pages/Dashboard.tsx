@@ -1,21 +1,29 @@
 import { useEffect, useState } from 'react'
-import { Row, Col, Table, Tag, Button, Space } from 'antd'
+import { Row, Col, Button, Space, Empty } from 'antd'
 import {
   ReloadOutlined,
-  DownloadOutlined
+  DownloadOutlined,
+  ArrowRightOutlined
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import ReactECharts from 'echarts-for-react'
-import { dashboardApi, exportApi } from '@/api'
+import { dashboardApi, exportApi, geoApi } from '@/api'
 
 const Dashboard = () => {
   const [stats, setStats] = useState<any>(null)
+  const [semanticStats, setSemanticStats] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
 
   const loadData = async () => {
     setLoading(true)
     try {
-      const res: any = await dashboardApi.getDoctorStats()
-      setStats(res.data)
+      const [statsRes, overviewRes] = await Promise.all([
+        dashboardApi.getDoctorStats(),
+        geoApi.getOverview()
+      ])
+      setStats(statsRes.data)
+      setSemanticStats(overviewRes.data.semantic_stats || [])
     } catch (e) {
       console.error(e)
     } finally {
@@ -82,15 +90,9 @@ const Dashboard = () => {
     }]
   } : {}
 
-  const rankColumns = [
-    { title: '语义问题', dataIndex: 'question', key: 'question', ellipsis: true },
-    { title: 'GEO率', dataIndex: 'geo_rate', key: 'geo_rate', width: 80,
-      render: (v: number) => <span style={{ color: v >= 50 ? '#10B981' : v >= 20 ? '#F59E0B' : '#EF4444', fontWeight: 600 }}>{v}%</span> },
-    { title: 'AEO率', dataIndex: 'aeo_rate', key: 'aeo_rate', width: 80,
-      render: (v: number) => <span style={{ color: v >= 30 ? '#8B5CF6' : '#94A3B8', fontWeight: 600 }}>{v}%</span> },
-    { title: '最佳排名', dataIndex: 'best_rank', key: 'best_rank', width: 80,
-      render: (r: number) => r > 0 ? <span style={{ color: '#10B981', fontWeight: 600 }}>第{r}名</span> : <span style={{ color: '#94A3B8' }}>未推荐</span> }
-  ]
+  // 语义表现概览：GEO推荐率最高前3 + AEO引用率最高前3
+  const topGeo = [...semanticStats].sort((a, b) => b.geo_rate - a.geo_rate).slice(0, 3)
+  const topAeo = [...semanticStats].sort((a, b) => b.aeo_rate - a.aeo_rate).slice(0, 3)
 
   return (
     <div>
@@ -170,39 +172,69 @@ const Dashboard = () => {
         </Col>
       </Row>
 
-      {/* 排名列表 */}
-      <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <div className="geo-card">
-            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600, color: '#10B981' }}>
-              GEO表现最好 Top5
-            </h3>
-            <Table
-              dataSource={stats?.top_semantics || []}
-              columns={rankColumns}
-              rowKey="semantic_id"
-              size="small"
-              pagination={false}
-              locale={{ emptyText: '暂无数据' }}
-            />
-          </div>
-        </Col>
-        <Col xs={24} lg={12}>
-          <div className="geo-card">
-            <h3 style={{ marginBottom: 16, fontSize: 16, fontWeight: 600, color: '#EF4444' }}>
-              需重点优化语义
-            </h3>
-            <Table
-              dataSource={stats?.bottom_semantics || []}
-              columns={rankColumns}
-              rowKey="semantic_id"
-              size="small"
-              pagination={false}
-              locale={{ emptyText: '暂无数据' }}
-            />
-          </div>
-        </Col>
-      </Row>
+      {/* 语义表现概览 */}
+      <div className="geo-card" style={{ marginTop: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, margin: 0 }}>语义表现概览</div>
+          <Button type="link" onClick={() => navigate('/data')}>
+            查看全部 <ArrowRightOutlined />
+          </Button>
+        </div>
+        <Row gutter={20}>
+          {/* GEO推荐率最高 */}
+          <Col xs={24} md={12}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#2563EB', marginBottom: 10 }}>
+              📈 GEO推荐率最高
+            </div>
+            {topGeo.length === 0 ? (
+              <Empty description="暂无监测数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {topGeo.map((s: any, i: number) => (
+                  <div key={s.semantic_id} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 14px', background: '#F8FAFC', borderRadius: 10
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, color: '#94A3B8', marginRight: 8 }}>{i + 1}</span>
+                      <span style={{ fontSize: 13 }}>{s.question}</span>
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#2563EB', marginLeft: 12 }}>
+                      {s.geo_rate}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Col>
+          {/* AEO引用率最高 */}
+          <Col xs={24} md={12}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', marginBottom: 10 }}>
+              🎯 AEO引用率最高
+            </div>
+            {topAeo.length === 0 ? (
+              <Empty description="暂无监测数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {topAeo.map((s: any, i: number) => (
+                  <div key={s.semantic_id} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 14px', background: '#F8FAFC', borderRadius: 10
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ fontSize: 12, color: '#94A3B8', marginRight: 8 }}>{i + 1}</span>
+                      <span style={{ fontSize: 13 }}>{s.question}</span>
+                    </div>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: '#8B5CF6', marginLeft: 12 }}>
+                      {s.aeo_rate}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </Col>
+        </Row>
+      </div>
     </div>
   )
 }

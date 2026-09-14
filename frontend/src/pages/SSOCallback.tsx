@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Spin, Result, Button } from 'antd'
 import { authApi } from '@/api'
@@ -10,8 +10,13 @@ const SSOCallback = () => {
   const setAuth = useAppStore((state) => state.setAuth)
   const [status, setStatus] = useState<'loading' | 'error' | 'success'>('loading')
   const [errorMsg, setErrorMsg] = useState('')
+  const exchangedRef = useRef(false)
 
   useEffect(() => {
+    // 防止 React StrictMode 双调用导致 ticket 重复使用（ticket是一次性的）
+    if (exchangedRef.current) return
+    exchangedRef.current = true
+
     const ticket = searchParams.get('ticket')
     const error = searchParams.get('error')
 

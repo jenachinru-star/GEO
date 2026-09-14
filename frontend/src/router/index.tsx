@@ -6,7 +6,7 @@ import { useAppStore } from '@/store/useStore'
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
 const DataCenter = lazy(() => import('@/pages/DataCenter'))
-const Content = lazy(() => import('@/pages/Content'))
+const ContentHub = lazy(() => import('@/pages/ContentHub'))
 const Knowledge = lazy(() => import('@/pages/Knowledge'))
 const Competitor = lazy(() => import('@/pages/Competitor'))
 const RAGChat = lazy(() => import('@/pages/RAGChat'))
@@ -14,7 +14,7 @@ const Settings = lazy(() => import('@/pages/Settings'))
 const SSOCallback = lazy(() => import('@/pages/SSOCallback'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Semantic = lazy(() => import('@/pages/Semantic'))
-const Create = lazy(() => import('@/pages/Create'))
+const TaskCenter = lazy(() => import('@/pages/TaskCenter'))
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAppStore()
@@ -32,14 +32,15 @@ const AppRouter = () => {
           <Route path="dashboard" element={<RequireAuth><Dashboard /></RequireAuth>} />
           <Route path="monitor" element={<RequireAuth><Monitor /></RequireAuth>} />
           <Route path="data" element={<RequireAuth><DataCenter /></RequireAuth>} />
-          <Route path="content" element={<RequireAuth><Content /></RequireAuth>} />
-          <Route path="create" element={<RequireAuth><Create /></RequireAuth>} />
+          <Route path="content" element={<RequireAuth><ContentHub /></RequireAuth>} />
+          <Route path="create" element={<Navigate to="/content" replace />} />
           <Route path="knowledge" element={<RequireAuth><Knowledge /></RequireAuth>} />
           <Route path="competitor" element={<RequireAuth><Competitor /></RequireAuth>} />
           <Route path="rag" element={<RequireAuth><RAGChat /></RequireAuth>} />
           <Route path="settings" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="semantic" element={<RequireAuth><Semantic /></RequireAuth>} />
+          <Route path="tasks" element={<RequireAuth><TaskCenter /></RequireAuth>} />
         </Route>
       </Routes>
     </Suspense>

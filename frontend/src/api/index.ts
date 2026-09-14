@@ -183,8 +183,9 @@ export const entityApi = {
 
 // ============ 文章模板 API ============
 export const templateApi = {
-  generateArticle: (semanticId: number) =>
-    request.get(`/template/article/${semanticId}`),
+  generateArticle: (semanticId: number, opportunityId?: number) =>
+    request.get(`/template/article/${semanticId}`, { params: opportunityId ? { opportunity_id: opportunityId } : {} }),
+  generateLlms: () => request.get('/template/llms.txt', { responseType: 'text' }),
 }
 
 // ============ 文章分发 API ============
@@ -197,6 +198,22 @@ export const distributionApi = {
 // ============ 工具配置 API ============
 export const toolsApi = {
   getConfig: () => request.get('/tools/config'),
+}
+
+// ============ 异步任务 API ============
+export const taskApi = {
+  get: (id: number) => request.get(`/task/${id}`),
+  list: (params?: { task_type?: string; status?: string; page?: number; page_size?: number }) =>
+    request.get('/task', { params }),
+  cancel: (id: number) => request.post(`/task/${id}/cancel`),
+}
+
+// ============ 内容机会 API ============
+export const opportunityApi = {
+  list: (params?: { status?: string; opportunity_type?: string }) =>
+    request.get('/opportunity', { params }),
+  scan: () => request.post('/opportunity/scan'),
+  dismiss: (id: number) => request.post(`/opportunity/${id}/dismiss`),
 }
 
 export default request

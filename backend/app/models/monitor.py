@@ -27,3 +27,10 @@ class MonitorRecord(Base):
     cite_count = Column(Integer, default=0)  # AEO：被引用次数（0或1）
     aeo_confidence = Column(Float, default=0.0)  # AEO引用置信度 0~1
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # ===== V2 证据字段 =====
+    mention_evidence = Column(Text, default="")  # 医生命中证据片段
+    recommendation_evidence = Column(Text, default="")  # 推荐关系证据
+    citation_urls = Column(Text, default="[]")  # 引用URL列表（JSON字符串）
+    analyzer_version = Column(String(50), default="rule_v1")  # 分析器版本
+    raw_sources_json = Column(Text, default="[]")  # 原始来源数据（JSON字符串）
+    is_recommendation = Column(Integer, default=0)  # 是否为推荐（1=是，0=否）

@@ -12,6 +12,7 @@ const DataCenter = () => {
   const [drawerVisible, setDrawerVisible] = useState(false)
   const [detail, setDetail] = useState<any>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [expandedRaw, setExpandedRaw] = useState<string | null>(null)
   const [trendDays, setTrendDays] = useState(7)
   const [trendData, setTrendData] = useState<any>(null)
 
@@ -59,6 +60,7 @@ const DataCenter = () => {
   const handleViewDetail = async (semanticId: number) => {
     setDrawerVisible(true)
     setDetailLoading(true)
+    setExpandedRaw(null)
     try {
       const res: any = await geoApi.getSemanticDetail(semanticId)
       setDetail(res.data)
@@ -67,6 +69,10 @@ const DataCenter = () => {
     } finally {
       setDetailLoading(false)
     }
+  }
+
+  const toggleRawAnswer = (platformCode: string) => {
+    setExpandedRaw(expandedRaw === platformCode ? null : platformCode)
   }
 
   // 趋势图
@@ -194,22 +200,65 @@ const DataCenter = () => {
               </Descriptions>
 
               <h4 style={{ marginBottom: 12, fontSize: 15, fontWeight: 600 }}>各平台检测结果</h4>
-              {detail.platform_details?.length ? detail.platform_details.map((p: any) => (
-                <div key={p.platform_code} className="geo-card" style={{ marginBottom: 12, padding: 16 }}>
-                  <div style={{ marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{PLATFORM_NAMES[p.platform_code] || p.platform_code}</span>
-                    <Tag color={p.geo_mentioned ? 'green' : 'default'} style={{ marginLeft: 8 }}>
-                      GEO: {p.geo_mentioned ? `第${p.geo_rank}名` : '未推荐'}
-                    </Tag>
-                    <Tag color={p.aeo_cited ? 'purple' : 'default'}>
-                      AEO: {p.aeo_cited ? `已引用(${p.aeo_confidence})` : '未引用'}
-                    </Tag>
-                  </div>
-                  <div style={{ background: '#F8FAFC', padding: 12, borderRadius: 12, fontSize: 13, lineHeight: 1.8, maxHeight: 300, overflow: 'auto', whiteSpace: 'pre-wrap' }}>
-                    {p.raw_answer || '暂无回答'}
-                  </div>
-                </div>
-              )) : <Empty description="暂无平台数据" />}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {detail.platform_details?.length ? detail.platform_details.map((p: any, idx: number) => {
+                  const platformName = PLATFORM_NAMES[p.platform_code] || p.platform_code
+                  const isGeo = p.geo_mentioned
+                  const isAeo = p.aeo_cited
+                  // 状态判断：AEO引用 > GEO推荐 > 未提及
+                  let statusLabel: string, statusColor: string, bgColor: string
+                  if (isAeo) {
+                    statusLabel = '已引用为唯一答案'
+                    statusColor = '#2563EB'
+                    bgColor = '#EFF6FF'
+                  } else if (isGeo) {
+                    statusLabel = `已推荐，排名第${p.geo_rank}`
+                    statusColor = '#10B981'
+                    bgColor = '#ECFDF5'
+                  } else {
+                    statusLabel = '未提及'
+                    statusColor = '#EF4444'
+                    bgColor = '#FEF2F2'
+                  }
+                  return (
+                    <div key={p.platform_code} style={{
+                      background: bgColor, padding: '16px 18px', borderRadius: 12,
+                      borderLeft: `3px solid ${statusColor}`
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <div style={{ fontSize: 15, fontWeight: 600 }}>
+                          <span style={{ color: '#94A3B8', marginRight: 8 }}>{String(idx + 1).padStart(2, '0')}</span>
+                          {platformName}
+                        </div>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: statusColor }}>{statusLabel}</span>
+                      </div>
+                      <div style={{ fontSize: 13, color: '#64748B', lineHeight: 1.6, marginBottom: 8 }}>
+                        {isAeo ? 'AI在回答中直接引用该医生为推荐答案，未列出其他竞品。' :
+                         isGeo ? `AI在回答中将该医生列入推荐列表，排名第${p.geo_rank}位。` :
+                         'AI回答中未提及该医生，给出的是通用就医建议。'}
+                      </div>
+                      {p.raw_answer && (
+                        <div>
+                          <Button type="link" size="small" style={{ padding: 0 }} onClick={() => toggleRawAnswer(p.platform_code)}>
+                            {expandedRaw === p.platform_code ? '收起原始回答' : '查看原始回答'}
+                          </Button>
+                          {expandedRaw === p.platform_code && (
+                            <div style={{
+                              marginTop: 8, padding: 12, background: '#fff', borderRadius: 8,
+                              fontSize: 12, color: '#475569', lineHeight: 1.7, maxHeight: 200, overflow: 'auto',
+                              whiteSpace: 'pre-wrap'
+                            }}>
+                              {p.raw_answer}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )
+                }) : (
+                  <Empty description="暂无平台检测数据，请先手动刷新采集" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+                )}
+              </div>
             </div>
           )}
         </Spin>

@@ -1,12 +1,14 @@
 import time
 import random
 import logging
+import json
 from datetime import datetime
 from typing import List, Dict, Optional, Callable
 from sqlalchemy.orm import Session
 
 from app.adapters import adapter_factory
 from app.engines.parser import AnswerParser
+from app.engines.llm_analyzer import llm_analyzer
 from app.models import Question, MonitorRecord, Competitor, CompetitorRecord
 from app.config import settings
 
@@ -161,20 +163,64 @@ class CollectorEngine:
             if success and answer:
                 result = analyzer.analyze(answer)
                 logger.info(f"  -> {platform_code}: GEO={'是' if result.geo_mentioned else '否'}(排名{result.geo_rank}), AEO={'是' if result.aeo_cited else '否'}")
+
+                # 提取提及证据片段
+                mention_evidence = ""
+                if result.geo_mentioned:
+                    # 在原文中找到医生名的位置，取前后100字符
+                    for pattern in analyzer.patterns:
+                        m = pattern.search(answer)
+                        if m:
+                            start = max(0, m.start() - 100)
+                            end = min(len(answer), m.end() + 100)
+                            mention_evidence = answer[start:end].strip()
+                            break
+
+                # LLM辅助分析（只对已提及医生的记录调用，节省成本）
+                is_recommendation = False
+                recommendation_evidence = ""
+                citation_urls = []
+                sentiment_score = 0.0
+                if result.geo_mentioned:
+                    try:
+                        llm_result = llm_analyzer.analyze(
+                            answer, profile.real_name, profile.hospital, profile.department
+                        )
+                        is_recommendation = llm_result.is_recommendation
+                        recommendation_evidence = llm_result.recommendation_evidence
+                        citation_urls = llm_result.citation_urls
+                        # 情感转分数：positive=0.5, neutral=0.0, negative=-0.5, mixed=0.2
+                        sentiment_map = {"positive": 0.5, "neutral": 0.0, "negative": -0.5, "mixed": 0.2}
+                        sentiment_score = sentiment_map.get(llm_result.sentiment, 0.0)
+                    except Exception as e:
+                        logger.warning(f"LLM分析失败，降级: {e}")
+
+                # AEO引用判断：有URL且被引用才算（design-v2要求）
+                aeo_cited = result.aeo_cited and len(citation_urls) > 0
+                # 如果规则判断AEO但没有URL，降低置信度
+                aeo_confidence = result.aeo_confidence if aeo_cited else (result.aeo_confidence * 0.3 if result.aeo_cited else 0.0)
+
                 record = MonitorRecord(
-                    question_id=semantic.id,  # 关键：填semantic.id，不是0！用于唯一约束
-                    semantic_id=semantic.id,  # 冗余，用于清晰查询
+                    question_id=semantic.id,
+                    semantic_id=semantic.id,
                     platform_code=platform_code,
-                    rank=result.geo_rank,
+                    rank=result.geo_rank if result.geo_rank else 0,  # 数据库rank是Integer，None存0
                     mentioned=result.geo_mentioned,
-                    sentiment=0.0,
+                    sentiment=sentiment_score,
                     raw_answer=answer,
                     detect_date=today,
                     detect_round=detect_round,
                     detect_type="doctor",
-                    recommend_count=1 if result.geo_mentioned else 0,
-                    cite_count=1 if result.aeo_cited else 0,
-                    aeo_confidence=result.aeo_confidence,
+                    recommend_count=1 if is_recommendation else 0,
+                    cite_count=1 if aeo_cited else 0,
+                    aeo_confidence=aeo_confidence,
+                    # 新增证据字段
+                    mention_evidence=mention_evidence,
+                    recommendation_evidence=recommendation_evidence,
+                    citation_urls=json.dumps(citation_urls, ensure_ascii=False),
+                    analyzer_version="rule_v2+llm_v1",
+                    raw_sources_json="[]",
+                    is_recommendation=1 if is_recommendation else 0,
                 )
             else:
                 logger.error(f"  -> {platform_code} 采集失败: {answer[:100]}")

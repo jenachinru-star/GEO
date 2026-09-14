@@ -23,7 +23,7 @@ func Execute() error {
 }
 
 func init() {
-	rootCmd.PersistentFlags().StringVar(&apiBaseURL, "api", "http://localhost:8000/api/v1", "后端API地址")
+	rootCmd.PersistentFlags().StringVar(&apiBaseURL, "api", "http://10.17.197.113:8000/api/v1", "后端API地址")
 	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(queryCmd)
 	rootCmd.AddCommand(scanCmd)

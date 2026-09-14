@@ -8,10 +8,16 @@ from dataclasses import dataclass
 class GEOAEOResult:
     """GEO/AEO检测结果"""
     geo_mentioned: bool       # GEO：被推荐进列表
-    geo_rank: int             # GEO排名（0=未被推荐）
+    geo_rank: int | None      # GEO排名，None=未形成明确排序
     aeo_cited: bool           # AEO：被引用为答案
     aeo_confidence: float     # AEO引用置信度 0~1
     raw_answer: str
+    # 新增字段（供LLM分析结果回填）
+    is_recommendation: bool = False
+    recommendation_evidence: str = ""
+    mention_evidence: str = ""
+    citation_urls: list = None
+    sentiment: str = "neutral"
 
 
 class GEOAEOAnalyzer:
@@ -47,14 +53,12 @@ class GEOAEOAnalyzer:
         # 医生姓名
         if self.doctor_name and len(self.doctor_name) >= 2:
             patterns.append(re.compile(re.escape(self.doctor_name)))
-        # 医院全称
-        if self.hospital and len(self.hospital) >= 4:
-            patterns.append(re.compile(re.escape(self.hospital)))
-        # 医院+医生
+        # 医院+医生 组合（医院名单独不算命中）
         if self.hospital and self.doctor_name:
             patterns.append(re.compile(re.escape(self.hospital + self.doctor_name)))
-        # 统一自我介绍
-        if self.self_intro and len(self.self_intro) >= 4:
+            patterns.append(re.compile(re.escape(self.hospital + ".*?" + self.doctor_name)))
+        # 统一自我介绍（通常包含医生名，作为辅助）
+        if self.self_intro and len(self.self_intro) >= 4 and self.doctor_name in self.self_intro:
             patterns.append(re.compile(re.escape(self.self_intro)))
         # 别名
         for alias in self.aliases:
@@ -65,7 +69,7 @@ class GEOAEOAnalyzer:
     def analyze(self, answer: str) -> GEOAEOResult:
         """分析回答，返回GEO/AEO结果"""
         if not answer or not answer.strip():
-            return GEOAEOResult(False, 0, False, 0.0, answer)
+            return GEOAEOResult(False, None, False, 0.0, answer)
 
         # 1. GEO检测：是否提及医生/医院
         geo_mentioned = False
@@ -78,7 +82,7 @@ class GEOAEOAnalyzer:
                 break
 
         if not geo_mentioned:
-            return GEOAEOResult(False, 0, False, 0.0, answer)
+            return GEOAEOResult(False, None, False, 0.0, answer)
 
         # 2. 提取GEO排名
         geo_rank = self._extract_rank(answer, mention_pos)
@@ -88,8 +92,8 @@ class GEOAEOAnalyzer:
 
         return GEOAEOResult(geo_mentioned, geo_rank, aeo_cited, aeo_confidence, answer)
 
-    def _extract_rank(self, answer: str, mention_pos: int) -> int:
-        """提取提及位置的排名（复用AnswerParser的逻辑）"""
+    def _extract_rank(self, answer: str, mention_pos: int) -> int | None:
+        """提取提及位置的排名。无法确定时返回 None（不再默认1）"""
         before_text = answer[:mention_pos]
         lines = before_text.split('\n')
         for line in reversed(lines):
@@ -104,13 +108,15 @@ class GEOAEOAnalyzer:
                 m = re.search(r'第([一二三四五六七八九十]+)', line)
                 if m and m.group(1) in cn_num:
                     return cn_num[m.group(1)]
-        # 按条目计数
+        # 按条目计数（仅当回答中确实存在列表结构时才适用）
         items = re.split(r'\n\s*\d+[\.、\)）]|\n\s*[-*•]\s', answer)
-        for i, item in enumerate(items):
-            for pattern in self.patterns:
-                if pattern.search(item):
-                    return i if i > 0 else 1
-        return 1  # 提及了但无明确序号，默认排名1
+        if len(items) > 1:
+            for i, item in enumerate(items):
+                for pattern in self.patterns:
+                    if pattern.search(item):
+                        return i if i > 0 else 1
+        # 无法确定排名，返回 None（不再默认1）
+        return None
 
     def _detect_aeo(self, answer: str, mention_pos: int, geo_mentioned: bool) -> Tuple[bool, float]:
         """检测是否为AEO引用

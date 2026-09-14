@@ -10,12 +10,13 @@ import {
   SettingOutlined,
   BellOutlined,
   ReloadOutlined,
+  SyncOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   UserOutlined,
   LoginOutlined,
   LogoutOutlined,
-  PlusOutlined
+  AppstoreOutlined
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store/useStore'
@@ -26,18 +27,16 @@ const { Header, Sider, Content } = Layout
 const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
   { key: '/semantic', icon: <FileTextOutlined />, label: '语义库' },
-  { key: '/create', icon: <PlusOutlined />, label: '创作中心' },
-  { key: '/content', icon: <FileTextOutlined />, label: '我的文章' },
+  { key: '/content', icon: <AppstoreOutlined />, label: '内容中心' },
   { key: '/data', icon: <MonitorOutlined />, label: '数据中心' },
-  { key: '/profile', icon: <UserOutlined />, label: '我的资料' },
-  { key: '/settings', icon: <SettingOutlined />, label: '账号设置' },
+  { key: '/tasks', icon: <SyncOutlined />, label: '任务中心' },
 ]
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const { systemInfo, platformList, user, clearAuth } = useAppStore()
+  const { systemInfo, user, clearAuth } = useAppStore()
 
   const selectedKey = location.pathname
 
@@ -111,7 +110,7 @@ const MainLayout = () => {
           className="sider-menu-light"
           style={{ background: 'transparent', borderRight: 0, marginTop: 12, padding: '0 4px' }}
         />
-        {!collapsed && (
+        {!collapsed && user && (
           <div style={{
             position: 'absolute',
             bottom: 16,
@@ -121,27 +120,7 @@ const MainLayout = () => {
             color: 'var(--text-tertiary)',
             fontSize: 11
           }}>
-            {user && (
-              <div style={{ marginBottom: 8, paddingBottom: 8, borderBottom: '1px solid var(--border-color)' }}>
-                <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{user.username}</div>
-                <div style={{ marginTop: 2 }}>免费版</div>
-              </div>
-            )}
-            <div>已启用平台：</div>
-            <div style={{ marginTop: 4 }}>
-              {platformList.filter(p => p.enabled).map(p => (
-                <span key={p.code} style={{
-                  display: 'inline-block',
-                  background: '#DBEAFE',
-                  color: '#1D4ED8',
-                  padding: '2px 8px',
-                  borderRadius: 6,
-                  margin: '2px 4px 2px 0',
-                  fontSize: 10,
-                  fontWeight: 500
-                }}>{p.name}</span>
-              ))}
-            </div>
+            <div style={{ color: 'var(--text-primary)', fontWeight: 500 }}>{user.username}</div>
           </div>
         )}
       </Sider>
@@ -178,7 +157,8 @@ const MainLayout = () => {
             {user ? (
               <Dropdown menu={{
                 items: [
-                  { key: 'profile', icon: <UserOutlined />, label: user.username },
+                  { key: 'profile', icon: <UserOutlined />, label: '个人资料', onClick: () => navigate('/profile') },
+                  { key: 'settings', icon: <SettingOutlined />, label: '账号设置', onClick: () => navigate('/settings') },
                   { type: 'divider' },
                   { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout }
                 ]

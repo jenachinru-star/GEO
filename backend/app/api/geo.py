@@ -12,6 +12,9 @@ from app.models.doctor import DoctorProfile
 from app.models.monitor import MonitorRecord
 from app.engines.collector import CollectorEngine
 from app.adapters import adapter_factory
+import json
+from app.models.task import AsyncTask
+from app.models.workspace import WorkspaceMember
 
 router = APIRouter(prefix="/api/v1/geo", tags=["GEO/AEO数据"])
 
@@ -193,9 +196,9 @@ def get_semantic_detail(
     }}
 
 
-@router.post("/refresh", summary="手动刷新GEO/AEO数据（同步采集，可能需要1-3分钟）")
+@router.post("/refresh", summary="手动刷新GEO/AEO数据（异步任务，立即返回task_id）")
 def refresh_data(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    """手动触发当前用户所有启用语义的GEO/AEO采集"""
+    """手动触发当前用户所有启用语义的GEO/AEO采集（异步，由Worker执行）"""
     # 检查Profile
     profile = db.query(DoctorProfile).filter(DoctorProfile.user_id == user_id).first()
     if not profile:
@@ -213,10 +216,41 @@ def refresh_data(db: Session = Depends(get_db), user_id: int = Depends(get_curre
     if not platforms:
         raise HTTPException(status_code=400, detail="没有已配置的AI平台")
 
-    collector = CollectorEngine(db)
-    result = collector.collect_all_semantics(user_id, detect_round=99)
+    # 获取用户默认 workspace_id
+    ws_member = db.query(WorkspaceMember).filter(
+        WorkspaceMember.user_id == user_id,
+        WorkspaceMember.role == "owner"
+    ).first()
+    workspace_id = ws_member.workspace_id if ws_member else None
 
-    return {"code": 0, "message": "success", "data": result}
+    # 检查是否已有 running 的同类型任务（防止重复提交）
+    running_task = db.query(AsyncTask).filter(
+        AsyncTask.created_by == user_id,
+        AsyncTask.task_type == "geo_refresh",
+        AsyncTask.status.in_(["queued", "running"])
+    ).first()
+    if running_task:
+        raise HTTPException(status_code=400, detail=f"已有正在执行的GEO刷新任务（ID: {running_task.id}），请等待完成")
+
+    # 创建异步任务
+    task = AsyncTask(
+        workspace_id=workspace_id,
+        task_type="geo_refresh",
+        status="queued",
+        progress=0,
+        progress_message="等待执行",
+        payload_json=json.dumps({"user_id": user_id}, ensure_ascii=False),
+        created_by=user_id,
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    return {"code": 0, "message": "任务已创建", "data": {
+        "task_id": task.id,
+        "status": "queued",
+        "message": "GEO/AEO刷新任务已提交，Worker将在后台执行"
+    }}
 
 
 @router.get("/trend", summary="获取GEO/AEO历史趋势")

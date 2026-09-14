@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     ARTICLE_TOOL_URL: str = "https://ops.szcczh.com/paper-next/"
     VIDEO_TOOL_URL: str = "https://video.szcczh.com/"
 
+    # 前端地址（SSO回调跳转用）
+    FRONTEND_URL: str = "http://localhost:3000"
+
     # 豆包（预留）
     DOUBAO_API_KEY: str = ""
     DOUBAO_BASE_URL: str = ""
@@ -50,6 +53,18 @@ class Settings(BaseSettings):
     MONITOR_TIMES_PER_DAY: int = 3
     MONITOR_TEMPERATURE: float = 0.3
     MONITOR_MAX_TOKENS: int = 2000
+    brand_aliases: List[str] = []  # 品牌别名列表，用于AnswerParser解析
+
+    # LLM 配置
+    LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = ""
+    LLM_MODEL: str = ""
+    LLM_TEMPERATURE: float = 0.7
+
+    # 生图配置（Seedream）
+    SEEDREAM_API_KEY: str = ""
+    SEEDREAM_BASE_URL: str = ""
+    SEEDREAM_MODEL: str = ""
 
     # IAM单点登录配置
     IAM_HOST: str = "https://iam.szcczh.com"
