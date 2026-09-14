@@ -51,3 +51,16 @@ def init_db():
         if 'aeo_confidence' not in cols:
             conn.execute(text("ALTER TABLE geo_monitor_record ADD COLUMN aeo_confidence FLOAT DEFAULT 0.0"))
         conn.commit()
+
+    # 迁移：geo_semantic 加语义延伸字段（幂等）
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(geo_semantic)"))]
+        if cols:
+            if 'parent_id' not in cols:
+                conn.execute(text("ALTER TABLE geo_semantic ADD COLUMN parent_id INTEGER"))
+                conn.execute(text("CREATE INDEX IF NOT EXISTS idx_geo_semantic_parent ON geo_semantic(parent_id)"))
+            if 'extend_type' not in cols:
+                conn.execute(text("ALTER TABLE geo_semantic ADD COLUMN extend_type VARCHAR(20)"))
+            if 'generated_at' not in cols:
+                conn.execute(text("ALTER TABLE geo_semantic ADD COLUMN generated_at DATETIME DEFAULT CURRENT_TIMESTAMP"))
+        conn.commit()

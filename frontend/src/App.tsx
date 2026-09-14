@@ -5,9 +5,12 @@ import { systemApi } from '@/api'
 import { useAppStore } from '@/store/useStore'
 
 function App() {
-  const { setSystemInfo, setPlatformList } = useAppStore()
+  const { setSystemInfo, setPlatformList, token } = useAppStore()
 
   useEffect(() => {
+    // 未登录时跳过预加载（/platforms 等接口需要JWT，避免无谓的401提示）
+    if (!token) return
+
     // 加载系统信息
     systemApi.getInfo().then((res: any) => {
       setSystemInfo(res.data)
@@ -16,7 +19,7 @@ function App() {
     systemApi.getPlatforms().then((res: any) => {
       setPlatformList(res.data)
     }).catch(() => {})
-  }, [])
+  }, [token])
 
   return (
     <BrowserRouter basename="/geo">

@@ -164,6 +164,7 @@ def migrate():
     print("[5/6] 语义延伸字段")
     ensure_column(conn, "geo_semantic", "parent_id", "INTEGER")
     ensure_column(conn, "geo_semantic", "extend_type", "TEXT")
+    ensure_column(conn, "geo_semantic", "generated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
 
     # ===== 6. 记录迁移版本 =====
     print("[6/6] 记录迁移版本")
