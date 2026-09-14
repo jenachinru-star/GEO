@@ -1,0 +1,49 @@
+{
+  "version": "shadow-questions-v1",
+  "locale": "zh-CN",
+  "default_region": "{{city}}",
+  "doctor_profile": {
+    "status": "awaiting_user_confirmation",
+    "doctor_name": "{{doctor_name}}",
+    "hospital": "{{hospital}}",
+    "department": "{{department}}",
+    "city": "{{city}}",
+    "specialty_primary": "{{specialty_primary}}",
+    "specialty_secondary": "{{specialty_secondary}}"
+  },
+  "questions": [
+    {"id":"D01","intent_type":"discovery","branded":false,"text":"{{city}}擅长诊治{{specialty_primary}}相关问题的医生有哪些？","purpose":"unbranded_doctor_discovery"},
+    {"id":"D02","intent_type":"discovery","branded":false,"text":"在{{city}}看{{specialty_primary}}应该如何选择医生？","purpose":"selection_criteria"},
+    {"id":"D03","intent_type":"discovery","branded":false,"text":"{{city}}{{department}}有哪些公开信息比较完整的医生？","purpose":"entity_discovery"},
+    {"id":"D04","intent_type":"discovery","branded":false,"text":"{{specialty_primary}}患者选择医生时应重点了解哪些专业经历？","purpose":"selection_criteria"},
+    {"id":"D05","intent_type":"discovery","branded":false,"text":"{{city}}哪些医院设有诊治{{specialty_primary}}的{{department}}？","purpose":"hospital_discovery"},
+    {"id":"D06","intent_type":"discovery","branded":false,"text":"想咨询{{specialty_secondary}}相关问题，应该选择什么专业方向的医生？","purpose":"specialty_discovery"},
+    {"id":"D07","intent_type":"discovery","branded":false,"text":"如何核实{{city}}{{department}}医生的公开执业信息？","purpose":"authority_discovery"},
+    {"id":"D08","intent_type":"discovery","branded":false,"text":"{{specialty_primary}}相关问题初次就医时应该挂哪个科室？","purpose":"care_navigation"},
+    {"id":"D09","intent_type":"discovery","branded":false,"text":"寻找{{city}}{{department}}医生时有哪些可靠的公开信息来源？","purpose":"source_discovery"},
+    {"id":"D10","intent_type":"discovery","branded":false,"text":"{{city}}诊治{{specialty_secondary}}的医生通常需要具备哪些专业能力？","purpose":"expertise_criteria"},
+    {"id":"D11","intent_type":"discovery","branded":false,"text":"{{specialty_primary}}患者在选择医院和医生时分别要看什么？","purpose":"doctor_hospital_comparison"},
+    {"id":"D12","intent_type":"discovery","branded":false,"text":"有哪些渠道可以了解{{city}}{{department}}医生的专业方向和出诊信息？","purpose":"channel_discovery"},
+
+    {"id":"B01","intent_type":"branded","branded":true,"text":"{{doctor_name}}医生目前在哪家医院和哪个科室执业？","purpose":"identity_verification"},
+    {"id":"B02","intent_type":"branded","branded":true,"text":"{{doctor_name}}医生公开资料显示的专业方向有哪些？","purpose":"specialty_verification"},
+    {"id":"B03","intent_type":"branded","branded":true,"text":"关于{{doctor_name}}医生，有哪些可核实的权威公开来源？","purpose":"source_verification"},
+    {"id":"B04","intent_type":"branded","branded":true,"text":"{{doctor_name}}医生是否在{{hospital}}{{department}}执业？请提供来源。","purpose":"hospital_verification"},
+    {"id":"B05","intent_type":"branded","branded":true,"text":"网上关于{{doctor_name}}医生的专业信息是否一致？","purpose":"consistency_verification"},
+    {"id":"B06","intent_type":"branded","branded":true,"text":"如何找到{{doctor_name}}医生的官方介绍或医院主页？","purpose":"navigation_verification"},
+
+    {"id":"C01","intent_type":"comparison","branded":false,"text":"{{specialty_primary}}相关问题选择综合医院还是专科医院更合适？","purpose":"institution_comparison"},
+    {"id":"C02","intent_type":"comparison","branded":false,"text":"选择{{department}}医生时，职称、医院和专业方向哪个更值得参考？","purpose":"criteria_comparison"},
+    {"id":"C03","intent_type":"comparison","branded":true,"text":"{{doctor_name}}医生与{{city}}其他{{department}}医生的公开专业方向有什么区别？","purpose":"competitor_comparison"},
+    {"id":"C04","intent_type":"comparison","branded":true,"text":"如果关注{{specialty_primary}}，{{doctor_name}}医生是否是合适候选？请说明依据和其他选择。","purpose":"candidate_comparison"},
+    {"id":"C05","intent_type":"comparison","branded":true,"text":"{{doctor_name}}医生和同院其他{{department}}医生应如何根据专业方向选择？","purpose":"same_hospital_comparison"},
+    {"id":"C06","intent_type":"comparison","branded":false,"text":"线上医生介绍与医院官方医生主页不一致时，应优先相信哪种来源？","purpose":"source_comparison"},
+
+    {"id":"I01","intent_type":"informational","branded":false,"text":"{{specialty_primary}}相关问题通常需要了解哪些检查信息？","purpose":"medical_information"},
+    {"id":"I02","intent_type":"informational","branded":false,"text":"出现{{specialty_primary}}相关不适时，哪些情况建议及时线下就医？","purpose":"care_safety"},
+    {"id":"I03","intent_type":"informational","branded":false,"text":"{{specialty_primary}}常见诊疗方式有哪些？不同个体为什么需要专业评估？","purpose":"treatment_education"},
+    {"id":"I04","intent_type":"informational","branded":false,"text":"了解{{specialty_secondary}}时，哪些医学来源相对可靠？","purpose":"medical_source_quality"},
+    {"id":"I05","intent_type":"informational","branded":false,"text":"患者就诊前应如何整理症状和既往检查资料？","purpose":"visit_preparation"},
+    {"id":"I06","intent_type":"informational","branded":false,"text":"医生科普文章中哪些信息应该标明来源和更新时间？","purpose":"content_citation_quality"}
+  ]
+}

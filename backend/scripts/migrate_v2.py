@@ -160,9 +160,15 @@ def migrate():
             print(f"  + 为用户 {user_id}({username}) 创建 Workspace {ws_id}")
     conn.commit()
 
-    # ===== 5. 记录迁移版本 =====
-    print("[5/5] 记录迁移版本")
+    # ===== 5. 语义延伸相关字段 =====
+    print("[5/6] 语义延伸字段")
+    ensure_column(conn, "geo_semantic", "parent_id", "INTEGER")
+    ensure_column(conn, "geo_semantic", "extend_type", "TEXT")
+
+    # ===== 6. 记录迁移版本 =====
+    print("[6/6] 记录迁移版本")
     record_migration(conn, "v2.0_base")
+    record_migration(conn, "v2.1_semantic_extend")
 
     print("✅ 数据库迁移完成")
     conn.close()

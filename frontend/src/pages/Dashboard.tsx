@@ -181,10 +181,10 @@ const Dashboard = () => {
           </Button>
         </div>
         <Row gutter={20}>
-          {/* GEO推荐率最高 */}
+          {/* GEO推荐率 */}
           <Col xs={24} md={12}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#2563EB', marginBottom: 10 }}>
-              📈 GEO推荐率最高
+              📈 GEO推荐率
             </div>
             {topGeo.length === 0 ? (
               <Empty description="暂无监测数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />
@@ -207,10 +207,10 @@ const Dashboard = () => {
               </div>
             )}
           </Col>
-          {/* AEO引用率最高 */}
+          {/* AEO引用率 */}
           <Col xs={24} md={12}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#8B5CF6', marginBottom: 10 }}>
-              🎯 AEO引用率最高
+              🎯 AEO引用率
             </div>
             {topAeo.length === 0 ? (
               <Empty description="暂无监测数据" image={Empty.PRESENTED_IMAGE_SIMPLE} />

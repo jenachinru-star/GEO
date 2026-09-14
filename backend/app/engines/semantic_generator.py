@@ -21,6 +21,7 @@ class SemanticGenerator:
 4. 覆盖不同提问角度：找医生、找医院、问治疗、问费用、问预防等
 5. 最少生成10个，最多15个
 6. 严格基于医生提供的真实信息，不得编造医院或专长
+7. 每个问题必须以中文问号"？"结尾
 
 输出格式：每行一个问题，不要编号，不要解释，不要markdown。"""
 
@@ -68,6 +69,10 @@ class SemanticGenerator:
             questions.extend(self._fallback_generate(profile))
             questions = list(dict.fromkeys(questions))
 
+        # 统一确保每个问题以问号结尾
+        questions = [self._ensure_question_mark(q) for q in questions]
+        questions = list(dict.fromkeys(questions))
+
         return questions[:15]
 
     def _get_adapter(self):
@@ -105,3 +110,11 @@ class SemanticGenerator:
             f"{city}{specialty}中医还是西医好？",
         ]
         return templates
+
+    @staticmethod
+    def _ensure_question_mark(question: str) -> str:
+        """确保问题以问号结尾"""
+        question = question.strip()
+        if not question.endswith('？') and not question.endswith('?'):
+            question = question + '？'
+        return question

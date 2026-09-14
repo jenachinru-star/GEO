@@ -157,6 +157,23 @@ const ContentHub = () => {
     message.success('模板已复制到剪贴板，可粘贴到文章工具中使用')
   }
 
+  const handleSaveTemplateToArticle = async () => {
+    if (!templateData || !selectedSemantic) return
+    try {
+      await articleApi.create({
+        title: templateData.title,
+        content: templateData.full_text || `${templateData.intro}\n\n${templateData.body}\n\n${templateData.conclusion}`,
+        semantic_id: selectedSemantic,
+        platform: 'wechat',
+        status: 'draft',
+      })
+      message.success('已保存到文章库')
+      loadData()
+    } catch (e: any) {
+      message.error('保存失败：' + (e.response?.data?.detail || e.message))
+    }
+  }
+
   // ========== 文章管理函数（来自 Content.tsx）==========
   const handleAdd = () => {
     setEditMode(false)
@@ -363,13 +380,16 @@ const ContentHub = () => {
         items={[
           {
             key: 'create',
-            label: '内容创作',
+            label: '智能创作',
             children: (
               <>
-      {/* ===== 【创作工作台】来自 Create.tsx ===== */}
+      {/* ===== 【智能创作】选语义 → AI生成文章 → 文章管理 ===== */}
       {/* 语义选择 */}
       <div className="geo-card" style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>🎨 创作工作台</div>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>🎨 智能创作</div>
+        <Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+          基于语义问题，AI 一键生成定向文章（LLM 驱动，医疗合规）
+        </Text>
         <Space direction="vertical" style={{ width: '100%' }}>
           <Text strong style={{ fontSize: 14 }}>第一步：选择语义问题</Text>
           <Select
@@ -393,119 +413,54 @@ const ContentHub = () => {
         </Space>
       </div>
 
-      {/* 工具卡片 */}
-      <Row gutter={16} style={{ marginBottom: 20 }}>
-        <Col xs={24} md={12}>
-          <div className="geo-card" style={{ height: '100%', borderLeft: '3px solid var(--primary)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-              <FileTextOutlined style={{ fontSize: 28, color: 'var(--primary)', marginRight: 12 }} />
-              <div>
-                <Title level={4} style={{ margin: 0 }}>生成文章</Title>
-                <Text type="secondary">问答式结构，AEO问句式标题</Text>
-              </div>
-            </div>
-            <div style={{ marginBottom: 16 }}>
-              <Text type="secondary" style={{ fontSize: 13 }}>发布平台：</Text>
-              <Select
-                value={selectedPlatform}
-                onChange={setSelectedPlatform}
-                style={{ width: 240, marginLeft: 8 }}
-                optionFilterProp="label"
-              >
-                {[1, 2, 3].map(tier => (
-                  <Select.OptGroup key={tier} label={tier === 1 ? '🔥 AI高优先抓取平台' : tier === 2 ? '🏥 医疗权威平台' : '📢 补充收录平台'}>
-                    {PUBLISH_PLATFORMS.filter(p => p.tier === tier).map(p => (
-                      <Select.Option key={p.code} value={p.code} label={p.name}>
-                        <span>{p.name}</span>
-                        <span style={{ color: '#999', fontSize: 12, marginLeft: 8 }}>{p.tierLabel}</span>
-                      </Select.Option>
-                    ))}
-                  </Select.OptGroup>
-                ))}
-              </Select>
-              {selectedPlatform && (() => {
-                const p = PUBLISH_PLATFORMS.find(x => x.code === selectedPlatform)
-                if (!p) return null
-                return (
-                  <div style={{ background: '#FFFBEB', padding: '10px 14px', borderRadius: 8, marginTop: 8, fontSize: 12 }}>
-                    <div style={{ color: '#92400E', marginBottom: 4 }}>💡 AI抓取价值：{p.aiValue}</div>
-                    <div style={{ color: '#92400E' }}>⚠️ 平台规则：{p.rules.join('；')}</div>
-                  </div>
-                )
-              })()}
+      {/* AI 生成文章按钮（选中语义后显示） */}
+      {selectedSemantic && (
+        <div className="geo-card" style={{ marginBottom: 20, borderLeft: '3px solid #3B82F6' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <div>
+              <Title level={5} style={{ margin: 0, color: '#1D4ED8' }}>✨ AI 生成文章</Title>
+              <Text type="secondary" style={{ fontSize: 12 }}>LLM 驱动，自动填充医生信息和医疗合规结构</Text>
             </div>
             <Button
               type="primary"
               size="large"
-              block
-              icon={<FileTextOutlined />}
-              onClick={handleGenerateArticle}
+              icon={<ThunderboltOutlined />}
+              onClick={handleGenerateTemplate}
+              loading={templateLoading}
               className="btn-primary-gradient"
             >
-              打开文章工具
+              {templateData ? '重新生成' : '生成文章'}
             </Button>
-          </div>
-        </Col>
-        <Col xs={24} md={12}>
-          <div className="geo-card" style={{ height: '100%', borderLeft: '3px solid var(--purple)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
-              <VideoCameraOutlined style={{ fontSize: 28, color: 'var(--purple)', marginRight: 12 }} />
-              <div>
-                <Title level={4} style={{ margin: 0 }}>生成视频</Title>
-                <Text type="secondary">口播/动画视频，多平台适配</Text>
-              </div>
-            </div>
-            <div style={{ marginBottom: 16, height: 32 }}>
-              <Text type="secondary" style={{ fontSize: 13 }}>基于当前语义问题生成视频内容</Text>
-            </div>
-            <Button
-              type="primary"
-              size="large"
-              block
-              icon={<VideoCameraOutlined />}
-              onClick={handleGenerateVideo}
-              style={{ background: 'var(--purple-gradient)', border: 'none', boxShadow: '0 4px 16px rgba(139,92,246,0.25)' }}
-            >
-              打开视频工具
-            </Button>
-          </div>
-        </Col>
-      </Row>
-
-      {/* GEO文章模板 */}
-      {selectedSemantic && (
-        <div className="geo-card" style={{ marginBottom: 20 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <Title level={5} style={{ margin: 0, color: '#1D4ED8' }}>📝 GEO/AEO 文章模板</Title>
-            <Space>
-              <Button onClick={handleGenerateTemplate} loading={templateLoading}>
-                {templateData ? '重新生成' : '生成模板'}
-              </Button>
-              {templateData && (
-                <Button type="primary" onClick={handleCopyTemplate} className="btn-primary-gradient">一键复制</Button>
-              )}
-            </Space>
           </div>
           {templateData ? (
             <div style={{ background: '#F8FAFC', padding: 16, borderRadius: 12, fontSize: 13, lineHeight: 1.8 }}>
-              <div style={{ fontWeight: 600, marginBottom: 8, color: '#1D4ED8' }}>【标题】{templateData.title}</div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <Tag color={templateData.source === 'llm' ? 'blue' : 'default'}>
+                  来源：{templateData.source === 'llm' ? 'AI 生成' : '模板降级'}
+                </Tag>
+                <Space>
+                  <Button onClick={handleCopyTemplate} icon={<FileTextOutlined />}>一键复制</Button>
+                  <Button type="primary" onClick={handleSaveTemplateToArticle} className="btn-primary-gradient">保存到文章库</Button>
+                </Space>
+              </div>
+              <div style={{ fontWeight: 600, marginBottom: 8, color: '#1D4ED8', fontSize: 15 }}>【标题】{templateData.title}</div>
               <div style={{ marginBottom: 8 }}><strong>【首段】</strong>{templateData.intro}</div>
               <div style={{ marginBottom: 8, whiteSpace: 'pre-wrap' }}><strong>【正文】</strong>{templateData.body}</div>
               <div style={{ marginBottom: 8 }}><strong>【文末】</strong>{templateData.conclusion}</div>
               <div style={{ color: '#6B7280' }}>
                 <strong>【标签】</strong>
-                {templateData.tags.map((t: string, i: number) => (
+                {templateData.tags?.map((t: string, i: number) => (
                   <span key={i} className="geo-tag geo-tag-blue" style={{ marginRight: 6 }}>{t}</span>
                 ))}
               </div>
             </div>
           ) : (
-            <Empty description="选择语义后点击生成模板，自动填充医生信息和标准结构" />
+            <Empty description="点击上方「生成文章」按钮，AI 将基于语义问题自动生成" image={Empty.PRESENTED_IMAGE_SIMPLE} />
           )}
         </div>
       )}
 
-      {/* ===== 【文章管理】来自 Content.tsx ===== */}
+      {/* ===== 【文章管理】 ===== */}
       <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 12 }}>📚 文章管理</div>
 
       {/* 统计卡片 */}
@@ -582,16 +537,139 @@ const ContentHub = () => {
             ),
           },
           {
+            key: 'tools',
+            label: '创作工具',
+            children: (
+              <>
+      {/* ===== 【创作工具】外部工具跳转 ===== */}
+      <div style={{ background: '#FFFBEB', padding: '12px 16px', borderRadius: 8, marginBottom: 20 }}>
+        <Text style={{ fontSize: 13, color: '#92400E' }}>
+          💡 以下为外部创作工具，点击后将在新窗口打开。系统内置的 AI 文章生成请使用「智能创作」Tab。
+        </Text>
+      </div>
+
+      <Row gutter={16}>
+        <Col xs={24} md={12}>
+          <div className="geo-card" style={{ height: '100%', borderLeft: '3px solid var(--primary)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <FileTextOutlined style={{ fontSize: 28, color: 'var(--primary)', marginRight: 12 }} />
+              <div>
+                <Title level={4} style={{ margin: 0 }}>生成文章工具</Title>
+                <Text type="secondary">外部工具，问答式结构，AEO问句式标题</Text>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>发布平台：</Text>
+              <Select
+                value={selectedPlatform}
+                onChange={setSelectedPlatform}
+                style={{ width: 240, marginLeft: 8 }}
+                optionFilterProp="label"
+              >
+                {[1, 2, 3].map(tier => (
+                  <Select.OptGroup key={tier} label={tier === 1 ? '🔥 AI高优先抓取平台' : tier === 2 ? '🏥 医疗权威平台' : '📢 补充收录平台'}>
+                    {PUBLISH_PLATFORMS.filter(p => p.tier === tier).map(p => (
+                      <Select.Option key={p.code} value={p.code} label={p.name}>
+                        <span>{p.name}</span>
+                        <span style={{ color: '#999', fontSize: 12, marginLeft: 8 }}>{p.tierLabel}</span>
+                      </Select.Option>
+                    ))}
+                  </Select.OptGroup>
+                ))}
+              </Select>
+              {selectedPlatform && (() => {
+                const p = PUBLISH_PLATFORMS.find(x => x.code === selectedPlatform)
+                if (!p) return null
+                return (
+                  <div style={{ background: '#FFFBEB', padding: '10px 14px', borderRadius: 8, marginTop: 8, fontSize: 12 }}>
+                    <div style={{ color: '#92400E', marginBottom: 4 }}>💡 AI抓取价值：{p.aiValue}</div>
+                    <div style={{ color: '#92400E' }}>⚠️ 平台规则：{p.rules.join('；')}</div>
+                  </div>
+                )
+              })()}
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              block
+              icon={<FileTextOutlined />}
+              onClick={handleGenerateArticle}
+              className="btn-primary-gradient"
+            >
+              打开文章工具
+            </Button>
+          </div>
+        </Col>
+        <Col xs={24} md={12}>
+          <div className="geo-card" style={{ height: '100%', borderLeft: '3px solid var(--purple)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', marginBottom: 12 }}>
+              <VideoCameraOutlined style={{ fontSize: 28, color: 'var(--purple)', marginRight: 12 }} />
+              <div>
+                <Title level={4} style={{ margin: 0 }}>生成视频工具</Title>
+                <Text type="secondary">外部工具，口播/动画视频，多平台适配</Text>
+              </div>
+            </div>
+            <div style={{ marginBottom: 16, height: 32 }}>
+              <Text type="secondary" style={{ fontSize: 13 }}>基于当前语义问题生成视频内容</Text>
+            </div>
+            <Button
+              type="primary"
+              size="large"
+              block
+              icon={<VideoCameraOutlined />}
+              onClick={handleGenerateVideo}
+              style={{ background: 'var(--purple-gradient)', border: 'none', boxShadow: '0 4px 16px rgba(139,92,246,0.25)' }}
+            >
+              打开视频工具
+            </Button>
+          </div>
+        </Col>
+      </Row>
+              </>
+            ),
+          },
+          {
             key: 'opportunity',
             label: <Badge count={opportunities.length} size="small" offset={[8, 0]}>内容机会</Badge>,
             children: (
               <>
       {/* ===== 内容机会 ===== */}
+      {/* 顶部说明区 */}
+      <div className="geo-card" style={{ marginBottom: 20, padding: '16px 20px' }}>
+        <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 10 }}>💡 内容机会是什么？</div>
+        <Text style={{ fontSize: 13, color: '#475569', display: 'block', marginBottom: 12 }}>
+          系统分析 AI 搜索数据后，告诉你「应该写什么文章」的建议。基于监测数据自动识别 GEO 优化机会，一键生成定向文章。
+        </Text>
+        <Row gutter={12}>
+          <Col xs={24} md={8}>
+            <div style={{ background: '#FEF2F2', padding: '10px 12px', borderRadius: 8 }}>
+              <div style={{ color: '#DC2626', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>🔴 AI未提及</div>
+              <div style={{ fontSize: 12, color: '#7F1D1D' }}>AI回答里没提到这个医生，需要多写内容提升曝光</div>
+            </div>
+          </Col>
+          <Col xs={24} md={8}>
+            <div style={{ background: '#FFFBEB', padding: '10px 12px', borderRadius: 8 }}>
+              <div style={{ color: '#D97706', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>🟡 缺少引用</div>
+              <div style={{ fontSize: 12, color: '#92400E' }}>提到了但没引用来源，需要发到可引用平台（知乎/公众号）</div>
+            </div>
+          </Col>
+          <Col xs={24} md={8}>
+            <div style={{ background: '#EFF6FF', padding: '10px 12px', borderRadius: 8 }}>
+              <div style={{ color: '#2563EB', fontWeight: 600, fontSize: 13, marginBottom: 4 }}>🔵 排名靠后</div>
+              <div style={{ fontSize: 12, color: '#1E40AF' }}>医生在AI推荐里排第3以后，需要优化文章质量提升排名</div>
+            </div>
+          </Col>
+        </Row>
+        <div style={{ marginTop: 12, fontSize: 12, color: '#64748B' }}>
+          <strong>使用流程：</strong>① 去「数据中心」跑采集获取 AI 搜索数据 → ② 点「扫描机会」自动分析 → ③ 点「生成文章」AI 基于机会定向生成
+        </div>
+      </div>
+
       <div className="geo-card" style={{ marginBottom: 20 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
           <div>
-            <Title level={5} style={{ margin: 0 }}>内容机会识别</Title>
-            <Text type="secondary" style={{ fontSize: 12 }}>基于监测数据自动识别 GEO 优化机会，一键生成定向文章</Text>
+            <Title level={5} style={{ margin: 0 }}>内容机会列表</Title>
+            <Text type="secondary" style={{ fontSize: 12 }}>共 {opportunities.length} 个待处理机会</Text>
           </div>
           <Space>
             <Button icon={<ReloadOutlined />} onClick={loadOpportunities} loading={oppLoading}>刷新</Button>
@@ -600,12 +678,28 @@ const ContentHub = () => {
             </Button>
           </Space>
         </div>
+        {opportunities.length === 0 && !oppLoading ? (
+          <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+            <Empty description={null} image={Empty.PRESENTED_IMAGE_SIMPLE} />
+            <div style={{ fontSize: 15, fontWeight: 600, color: '#334155', marginBottom: 16 }}>暂无内容机会</div>
+            <div style={{ fontSize: 13, color: '#64748B', marginBottom: 20, textAlign: 'left', maxWidth: 500, margin: '0 auto 20px' }}>
+              <div style={{ marginBottom: 8 }}>📋 <strong>开始使用：</strong></div>
+              <div style={{ marginBottom: 6 }}>第1步：去「数据中心」跑采集，获取 AI 搜索真实数据</div>
+              <div style={{ marginBottom: 6 }}>第2步：回来点「扫描机会」，系统自动分析哪些问题需要写内容</div>
+              <div>第3步：点「生成文章」，AI 基于机会定向生成</div>
+            </div>
+            <Space>
+              <Button type="primary" onClick={handleScanOpportunities} loading={oppScanning} className="btn-primary-gradient">
+                扫描机会
+              </Button>
+            </Space>
+          </div>
+        ) : (
         <Table
           dataSource={opportunities}
           rowKey="id"
           loading={oppLoading}
           pagination={false}
-          locale={{ emptyText: <Empty description={'暂无内容机会，点击「扫描机会」开始识别'} /> }}
           columns={[
             {
               title: '机会类型', dataIndex: 'opportunity_type', width: 120,
@@ -623,7 +717,7 @@ const ContentHub = () => {
               ),
             },
             {
-              title: '证据', dataIndex: 'evidence', width: 200, ellipsis: true,
+              title: '证据（为什么推荐）', dataIndex: 'evidence', width: 200, ellipsis: true,
               render: (ev: any) => {
                 if (!ev) return '-'
                 if (ev.mention_rate !== undefined) return `提及率 ${ev.mention_rate}% (${ev.mentioned_count}/${ev.total_count})`
@@ -633,7 +727,18 @@ const ContentHub = () => {
               },
             },
             {
-              title: '操作', width: 180,
+              title: '建议（怎么做）', dataIndex: 'opportunity_type', width: 180,
+              render: (t: string) => {
+                const suggestions: Record<string, string> = {
+                  missing_mention: '写一篇强调医生姓名+医院+科室的科普文章',
+                  missing_citation: '把文章发布到知乎/公众号等AI可引用平台',
+                  low_rank: '优化文章关键词匹配度，提升内容质量和权威性',
+                }
+                return <Text style={{ fontSize: 12, color: '#64748B' }}>{suggestions[t] || '-'}</Text>
+              },
+            },
+            {
+              title: '操作', width: 160,
               render: (_: any, record: any) => (
                 <Space size="small">
                   <Button type="primary" size="small" icon={<FileTextOutlined />} onClick={() => handleGenerateFromOpportunity(record)} className="btn-primary-gradient">
@@ -647,6 +752,7 @@ const ContentHub = () => {
             },
           ]}
         />
+        )}
       </div>
               </>
             ),

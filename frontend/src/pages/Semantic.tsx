@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react'
-import { List, Switch, Button, Empty, message, Spin, Statistic, Row, Col } from 'antd'
+import { List, Switch, Button, Empty, message, Spin, Statistic, Row, Col, Space, Tooltip } from 'antd'
 import { useNavigate } from 'react-router-dom'
+import { BranchesOutlined } from '@ant-design/icons'
 import { semanticApi, doctorApi } from '@/api'
 import { useAppStore } from '@/store/useStore'
+import SemanticExtendDrawer from '@/components/SemanticExtendDrawer'
 
 const Semantic = () => {
   const [loading, setLoading] = useState(false)
   const [regenerating, setRegenerating] = useState(false)
+  const [extendDrawerOpen, setExtendDrawerOpen] = useState(false)
+  const [currentSemanticId, setCurrentSemanticId] = useState<number | null>(null)
+  const [currentSemanticQuestion, setCurrentSemanticQuestion] = useState('')
   const navigate = useNavigate()
   const { semantics, setSemantics } = useAppStore()
 
@@ -48,6 +53,16 @@ const Semantic = () => {
     }
   }
 
+  const handleExtend = (item: any) => {
+    setCurrentSemanticId(item.id)
+    setCurrentSemanticQuestion(item.question)
+    setExtendDrawerOpen(true)
+  }
+
+  const handleExtendSaved = () => {
+    loadSemantics()
+  }
+
   const activeCount = semantics.filter((s: any) => s.is_active).length
 
   return (
@@ -57,7 +72,14 @@ const Semantic = () => {
           <h2>语义库</h2>
           <div className="page-desc">系统基于您的执业信息自动生成患者会真实搜索的问题</div>
         </div>
-        <Button onClick={handleRegenerate} loading={regenerating}>重新生成</Button>
+        <Space>
+          <Tooltip title="对所有启用的语义批量生成同义变体和深度延伸">
+            <Button icon={<BranchesOutlined />} onClick={() => message.info('批量延伸功能开发中，请使用单个语义的延伸按钮')}>
+              批量延伸
+            </Button>
+          </Tooltip>
+          <Button onClick={handleRegenerate} loading={regenerating}>重新生成</Button>
+        </Space>
       </div>
 
       <Row gutter={16} style={{ marginBottom: 20 }}>
@@ -100,6 +122,15 @@ const Semantic = () => {
               renderItem={(item: any) => (
                 <List.Item
                   actions={[
+                    <Button
+                      type="link"
+                      size="small"
+                      icon={<BranchesOutlined />}
+                      onClick={() => handleExtend(item)}
+                      style={{ padding: '0 4px' }}
+                    >
+                      延伸
+                    </Button>,
                     <Switch
                       checked={item.is_active}
                       onChange={() => handleToggle(item.id)}
@@ -133,6 +164,14 @@ const Semantic = () => {
           )}
         </Spin>
       </div>
+
+      <SemanticExtendDrawer
+        open={extendDrawerOpen}
+        onClose={() => setExtendDrawerOpen(false)}
+        semanticId={currentSemanticId}
+        semanticQuestion={currentSemanticQuestion}
+        onSaved={handleExtendSaved}
+      />
     </div>
   )
 }

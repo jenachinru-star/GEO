@@ -16,5 +16,7 @@ class Semantic(Base):
     geo_rate = Column(Float, default=0.0)
     aeo_rate = Column(Float, default=0.0)
     article_count = Column(Integer, default=0)
+    parent_id = Column(Integer, nullable=True, index=True)
+    extend_type = Column(String(20), nullable=True)
     generated_at = Column(DateTime(timezone=True), server_default=func.now())
     created_at = Column(DateTime(timezone=True), server_default=func.now())

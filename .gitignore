@@ -40,3 +40,6 @@ target/
 *.swo
 .DS_Store
 Thumbs.db
+
+# ---- 影子实验产物（可能包含模型原始回答，禁止提交） ----
+/artifacts/shadow/
