@@ -2,7 +2,7 @@ import axios from 'axios'
 import { message } from 'antd'
 
 const request = axios.create({
-  baseURL: '/api/v1',
+  baseURL: '/geo/api/v1',
   timeout: 180000,  // GEO/AEO采集可能需要1-3分钟
   headers: {
     'Content-Type': 'application/json'
@@ -164,6 +164,10 @@ export const semanticApi = {
   getList: (params?: any) => request.get('/semantic', { params }),
   toggle: (id: number) => request.post(`/semantic/${id}/toggle`),
   addPaid: (question: string) => request.post('/semantic/add-paid', null, { params: { question } }),
+  extend: (id: number) => request.post(`/semantic/${id}/extend`),
+  extendBatch: () => request.post('/semantic/extend-batch'),
+  saveExtended: (data: { questions: string[]; parent_id: number; extend_type: string }) =>
+    request.post('/semantic/extend/save', data),
 }
 
 // ============ 文章管理 API ============

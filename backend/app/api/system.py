@@ -14,14 +14,13 @@ def get_system_info():
         "data": {
             "app_name": settings.APP_NAME,
             "version": "1.0.0",
-            "env": settings.APP_ENV,
             "enabled_platforms": adapter_factory.get_enabled_platforms()
         }
     }
 
 
 @router.get("/platforms", summary="获取平台配置状态")
-def get_platforms():
+def get_platforms(user_id: int = Depends(get_current_user_id)):
     platforms = []
     platform_configs = [
         ("deepseek", "DeepSeek", settings.DEEPSEEK_API_KEY, settings.DEEPSEEK_MODEL),

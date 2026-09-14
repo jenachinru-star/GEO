@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
+  base: '/geo/',
   plugins: [react()],
   resolve: {
     alias: {
@@ -13,9 +14,10 @@ export default defineConfig({
     port: 3000,
     host: '0.0.0.0',
     proxy: {
-      '/api': {
+      '/geo/api': {
         target: 'http://10.17.197.113:8000/',
-        changeOrigin: true
+        changeOrigin: true,
+        rewrite: (p: string) => p.replace(/^\/geo/, '')
       }
     }
   },
