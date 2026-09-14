@@ -196,7 +196,12 @@ export const templateApi = {
 export const distributionApi = {
   getList: (params?: any) => request.get('/distribution', { params }),
   create: (data: any) => request.post('/distribution', data),
+  updateStatus: (id: number, data: { status: string; publish_url?: string; note?: string }) =>
+    request.patch(`/distribution/${id}/status`, data),
+  retry: (id: number) => request.post(`/distribution/${id}/retry`),
   delete: (id: number) => request.delete(`/distribution/${id}`),
+  getEffect: (id: number) => request.get(`/distribution/${id}/effect`),
+  recollect: (id: number) => request.post(`/distribution/${id}/recollect`),
 }
 
 // ============ 工具配置 API ============

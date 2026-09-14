@@ -16,7 +16,8 @@ import {
   UserOutlined,
   LoginOutlined,
   LogoutOutlined,
-  AppstoreOutlined
+  AppstoreOutlined,
+  SendOutlined
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store/useStore'
@@ -28,6 +29,7 @@ const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
   { key: '/semantic', icon: <FileTextOutlined />, label: '语义库' },
   { key: '/content', icon: <AppstoreOutlined />, label: '内容中心' },
+  { key: '/distribution', icon: <SendOutlined />, label: '发布管理' },
   { key: '/data', icon: <MonitorOutlined />, label: '数据中心' },
   { key: '/tasks', icon: <SyncOutlined />, label: '任务中心' },
 ]

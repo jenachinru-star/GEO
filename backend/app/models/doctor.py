@@ -19,5 +19,12 @@ class DoctorProfile(Base):
     awards = Column(Text, default="")
     case_history = Column(Text, default="")
     self_intro_template = Column(String(500), default="")
+    # ===== V2.1 个人品牌新增字段 =====
+    avatar_url = Column(String(500), default="")
+    bio = Column(Text, default="")
+    social_links = Column(Text, default="[]")
+    personal_website = Column(String(500), default="")
+    registration_url = Column(String(500), default="")
+    clinic_hours = Column(Text, default="[]")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

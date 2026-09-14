@@ -25,6 +25,12 @@ def get_profile(db: Session = Depends(get_db), user_id: int = Depends(get_curren
         "awards": profile.awards,
         "case_history": profile.case_history,
         "self_intro_template": profile.self_intro_template,
+        "avatar_url": profile.avatar_url,
+        "bio": profile.bio,
+        "social_links": profile.social_links,
+        "personal_website": profile.personal_website,
+        "registration_url": profile.registration_url,
+        "clinic_hours": profile.clinic_hours,
     } if profile else None
     return {"code": 0, "message": "success", "data": data}
 
@@ -39,7 +45,9 @@ def save_profile(data: dict, db: Session = Depends(get_db), user_id: int = Depen
 
     # 只更新传入的字段
     allowed_fields = ["real_name", "title", "province", "city", "hospital",
-                      "department", "specialty", "awards", "case_history"]
+                      "department", "specialty", "awards", "case_history",
+                      "avatar_url", "bio", "social_links", "personal_website",
+                      "registration_url", "clinic_hours"]
     for key in allowed_fields:
         if key in data:
             setattr(profile, key, data[key])
@@ -84,6 +92,11 @@ def save_profile(data: dict, db: Session = Depends(get_db), user_id: int = Depen
                 "id": profile.id,
                 "real_name": profile.real_name,
                 "self_intro_template": profile.self_intro_template,
+                "avatar_url": profile.avatar_url,
+                "bio": profile.bio,
+                "hospital": profile.hospital,
+                "department": profile.department,
+                "specialty": profile.specialty,
             },
             "semantic_generated": generated_count,
         }

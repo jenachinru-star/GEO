@@ -4,12 +4,12 @@ import logging
 from sqlalchemy.orm import Session
 from app.models.task import AsyncTask
 from app.engines.collector import CollectorEngine
-from app.worker.task_registry import register_handler
+from app.worker.task_registry import register_handler, ProgressCallback
 
 logger = logging.getLogger(__name__)
 
 
-def handle_geo_refresh(db: Session, task: AsyncTask) -> dict:
+def handle_geo_refresh(db: Session, task: AsyncTask, on_progress: ProgressCallback = None) -> dict:
     """处理 GEO/AEO 全量刷新任务"""
     payload = json.loads(task.payload_json or "{}")
     user_id = payload.get("user_id")
@@ -17,11 +17,11 @@ def handle_geo_refresh(db: Session, task: AsyncTask) -> dict:
         raise ValueError("payload 中缺少 user_id")
 
     collector = CollectorEngine(db)
-    result = collector.collect_all_semantics(user_id, detect_round=99)
+    result = collector.collect_all_semantics(user_id, detect_round=99, progress_callback=on_progress)
     return result
 
 
-def handle_monitor_collect(db: Session, task: AsyncTask) -> dict:
+def handle_monitor_collect(db: Session, task: AsyncTask, on_progress: ProgressCallback = None) -> dict:
     """处理品牌监测采集任务"""
     payload = json.loads(task.payload_json or "{}")
     question_id = payload.get("question_id")
@@ -29,10 +29,12 @@ def handle_monitor_collect(db: Session, task: AsyncTask) -> dict:
 
     collector = CollectorEngine(db)
     if question_id:
+        if on_progress:
+            on_progress(1, 1, f"采集问题 #{question_id}")
         records = collector.collect_single_question_now(question_id)
         return {"total": 1, "success": 1, "records_count": len(records)}
     else:
-        return collector.collect_all(detect_round=detect_round)
+        return collector.collect_all(detect_round=detect_round, progress_callback=on_progress)
 
 
 # 注册任务处理函数

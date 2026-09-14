@@ -1,7 +1,7 @@
 // 任务中心页面 — 展示所有异步任务的状态和进度
 import { useState, useEffect, useCallback } from 'react'
-import { Table, Tag, Progress, Button, Space, Card, Typography, Empty, Badge, message } from 'antd'
-import { ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined } from '@ant-design/icons'
+import { Table, Tag, Progress, Button, Space, Card, Typography, Empty, Badge, message, Tooltip } from 'antd'
+import { ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons'
 import { taskApi } from '@/api'
 
 const { Title } = Typography
@@ -96,7 +96,8 @@ const TaskCenter = () => {
       width: 180,
       render: (progress: number, record: any) => {
         if (record.status === 'succeeded') return <Progress percent={100} size="small" status="success" />
-        if (record.status === 'failed') return <Progress percent={progress || 0} size="small" status="exception" />
+        if (record.status === 'failed') return <Progress percent={100} size="small" status="exception" />
+        if (record.status === 'cancelled') return <Progress percent={progress || 0} size="small" showInfo={false} />
         if (record.status === 'running') return <Progress percent={progress || 0} size="small" status="active" />
         return <Progress percent={0} size="small" />
       },
@@ -105,7 +106,19 @@ const TaskCenter = () => {
       title: '进度说明',
       dataIndex: 'progress_message',
       ellipsis: true,
-      render: (msg: string, record: any) => record.error_message || msg || '-',
+      render: (msg: string, record: any) => {
+        if (record.status === 'failed' && record.error_message) {
+          return (
+            <Tooltip title={record.error_message} placement="topLeft">
+              <span style={{ color: '#ff4d4f', fontSize: 13 }}>
+                <WarningOutlined style={{ marginRight: 4 }} />
+                {record.error_message}
+              </span>
+            </Tooltip>
+          )
+        }
+        return msg || '-'
+      },
     },
     {
       title: '创建时间',

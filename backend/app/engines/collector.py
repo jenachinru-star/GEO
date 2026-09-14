@@ -262,13 +262,16 @@ class CollectorEngine:
 
         return records
 
-    def collect_all_semantics(self, user_id: int, detect_round: int = 99) -> Dict:
+    def collect_all_semantics(self, user_id: int, detect_round: int = 99,
+                               progress_callback: Optional[Callable] = None) -> Dict:
         """采集指定用户所有启用语义的GEO/AEO数据"""
         from app.models.semantic import Semantic
         from app.models.doctor import DoctorProfile
 
         profile = self.db.query(DoctorProfile).filter(DoctorProfile.user_id == user_id).first()
         if not profile:
+            if progress_callback:
+                progress_callback(1, 1, "未找到医生Profile")
             return {"total": 0, "success": 0, "error": "未找到医生Profile"}
 
         semantics = self.db.query(Semantic).filter(
@@ -280,6 +283,12 @@ class CollectorEngine:
         success_count = 0
         all_records = []
 
+        if total == 0:
+            if progress_callback:
+                progress_callback(1, 1, "暂无启用的语义问题")
+            logger.info(f"用户 [{user_id}] 无启用的语义问题，跳过采集")
+            return {"total": 0, "success": 0, "records_count": 0, "platforms": adapter_factory.get_enabled_platforms()}
+
         logger.info(f"开始用户 [{user_id}] 全量GEO/AEO采集，共 {total} 个语义")
 
         for i, semantic in enumerate(semantics):
@@ -289,6 +298,11 @@ class CollectorEngine:
                 success_count += 1
             except Exception as e:
                 logger.error(f"采集语义失败 [{semantic.question}]: {e}")
+
+            if progress_callback:
+                progress_callback(i + 1, total, semantic.question)
+
+            # 问题之间加延迟
             if i < total - 1:
                 time.sleep(2)
 

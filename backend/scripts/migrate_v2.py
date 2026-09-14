@@ -161,15 +161,26 @@ def migrate():
     conn.commit()
 
     # ===== 5. 语义延伸相关字段 =====
-    print("[5/6] 语义延伸字段")
+    print("[5/7] 语义延伸字段")
     ensure_column(conn, "geo_semantic", "parent_id", "INTEGER")
     ensure_column(conn, "geo_semantic", "extend_type", "TEXT")
     ensure_column(conn, "geo_semantic", "generated_at", "DATETIME DEFAULT CURRENT_TIMESTAMP")
 
     # ===== 6. 记录迁移版本 =====
-    print("[6/6] 记录迁移版本")
+    print("[6/7] 记录迁移版本")
     record_migration(conn, "v2.0_base")
     record_migration(conn, "v2.1_semantic_extend")
+
+    # ===== 7. 医生资料个人品牌字段 =====
+    print("[7/7] 医生资料个人品牌字段")
+    ensure_column(conn, "geo_doctor_profile", "avatar_url", "TEXT DEFAULT ''")
+    ensure_column(conn, "geo_doctor_profile", "bio", "TEXT DEFAULT ''")
+    ensure_column(conn, "geo_doctor_profile", "social_links", "TEXT DEFAULT '[]'")
+    ensure_column(conn, "geo_doctor_profile", "personal_website", "TEXT DEFAULT ''")
+    ensure_column(conn, "geo_doctor_profile", "registration_url", "TEXT DEFAULT ''")
+    ensure_column(conn, "geo_doctor_profile", "clinic_hours", "TEXT DEFAULT '[]'")
+
+    record_migration(conn, "v2.2_doctor_brand")
 
     print("✅ 数据库迁移完成")
     conn.close()

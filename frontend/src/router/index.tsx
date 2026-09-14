@@ -15,6 +15,7 @@ const SSOCallback = lazy(() => import('@/pages/SSOCallback'))
 const Profile = lazy(() => import('@/pages/Profile'))
 const Semantic = lazy(() => import('@/pages/Semantic'))
 const TaskCenter = lazy(() => import('@/pages/TaskCenter'))
+const Distribution = lazy(() => import('@/pages/Distribution'))
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAppStore()
@@ -33,6 +34,7 @@ const AppRouter = () => {
           <Route path="monitor" element={<RequireAuth><Monitor /></RequireAuth>} />
           <Route path="data" element={<RequireAuth><DataCenter /></RequireAuth>} />
           <Route path="content" element={<RequireAuth><ContentHub /></RequireAuth>} />
+          <Route path="distribution" element={<RequireAuth><Distribution /></RequireAuth>} />
           <Route path="create" element={<Navigate to="/content" replace />} />
           <Route path="knowledge" element={<RequireAuth><Knowledge /></RequireAuth>} />
           <Route path="competitor" element={<RequireAuth><Competitor /></RequireAuth>} />

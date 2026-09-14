@@ -3,8 +3,11 @@ from typing import Callable, Dict
 from sqlalchemy.orm import Session
 from app.models.task import AsyncTask
 
-# 任务处理函数签名：def handler(db: Session, task: AsyncTask) -> dict
-TaskHandler = Callable[[Session, AsyncTask], dict]
+# 进度回调签名：def on_progress(current: int, total: int, message: str) -> None
+ProgressCallback = Callable[[int, int, str], None]
+
+# 任务处理函数签名：def handler(db: Session, task: AsyncTask, on_progress: ProgressCallback) -> dict
+TaskHandler = Callable[[Session, AsyncTask, ProgressCallback], dict]
 
 _task_handlers: Dict[str, TaskHandler] = {}
 
