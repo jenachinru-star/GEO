@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# 密钥与本地数据不入镜像（运行时经 compose env_file / 卷注入）
+.env
+.env.*
+data/
+
+# IDE / 系统
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
