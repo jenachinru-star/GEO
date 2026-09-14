@@ -1,0 +1,405 @@
+/* ============ GEO 智能运营中台 - 高级医疗专业风视觉系统 ============ */
+
+:root {
+  /* 主色系 - 医疗蓝渐变 */
+  --primary: #2563EB;
+  --primary-dark: #1D4ED8;
+  --primary-light: #0EA5E9;
+  --primary-gradient: linear-gradient(135deg, #2563EB 0%, #0EA5E9 100%);
+  --primary-gradient-soft: linear-gradient(135deg, rgba(37,99,235,0.08), rgba(14,165,233,0.04));
+
+  /* 辅助色 */
+  --success: #10B981;
+  --success-dark: #059669;
+  --success-gradient: linear-gradient(135deg, #10B981 0%, #34D399 100%);
+  --warning: #F59E0B;
+  --warning-gradient: linear-gradient(135deg, #F59E0B 0%, #FBBF24 100%);
+  --danger: #EF4444;
+  --danger-gradient: linear-gradient(135deg, #EF4444 0%, #F87171 100%);
+  --purple: #8B5CF6;
+  --purple-gradient: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 100%);
+
+  /* 背景色 */
+  --bg-page: #F0F4F8;
+  --bg-card: #FFFFFF;
+  --bg-sider: #FFFFFF;
+  --bg-sider-hover: #F8FAFC;
+
+  /* 文字色 */
+  --text-primary: #0F172A;
+  --text-secondary: #64748B;
+  --text-tertiary: #94A3B8;
+  --text-inverse: #FFFFFF;
+
+  /* 边框 */
+  --border-color: #E2E8F0;
+  --border-light: #F1F5F9;
+
+  /* 阴影 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 24px rgba(0,0,0,0.08);
+  --shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-primary: 0 4px 16px rgba(37,99,235,0.25);
+
+  /* 圆角 */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', Roboto, sans-serif;
+  background: var(--bg-page);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* ============ 滚动条 ============ */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* ============ 卡片系统 ============ */
+.geo-card {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+  padding: 24px;
+  box-shadow: var(--shadow-card);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.geo-card:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* ============ 渐变指标卡 ============ */
+.stat-card-gradient {
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4,0,0.2,1);
+  border: none;
+}
+.stat-card-gradient:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
+}
+.stat-card-gradient::after {
+  content: '';
+  position: absolute;
+  top: -30px;
+  right: -30px;
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.1);
+}
+.stat-card-gradient .stat-label {
+  font-size: 13px;
+  opacity: 0.9;
+  font-weight: 500;
+}
+.stat-card-gradient .stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+  letter-spacing: -0.5px;
+}
+.stat-card-gradient .stat-sub {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+/* ============ 页面标题区 ============ */
+.page-title-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.page-title-bar h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #0F172A 0%, #2563EB 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.page-title-bar .page-desc {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+/* 兼容旧 page-header class */
+.page-header {
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+.page-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0;
+  background: linear-gradient(135deg, #0F172A 0%, #2563EB 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.page-header .page-desc {
+  color: var(--text-secondary);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+/* ============ 内容区 ============ */
+.page-content {
+  padding: 28px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ============ 顶部栏毛玻璃 ============ */
+.header-glass {
+  background: rgba(255,255,255,0.85) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border-color) !important;
+}
+
+/* ============ 亮色侧边栏菜单 ============ */
+.sider-menu-light .ant-menu-item {
+  margin: 4px 12px !important;
+  border-radius: 10px !important;
+  color: var(--text-secondary) !important;
+  font-weight: 500;
+  transition: all 0.25s ease;
+}
+.sider-menu-light .ant-menu-item:hover {
+  background: var(--bg-sider-hover) !important;
+  color: var(--primary) !important;
+}
+.sider-menu-light .ant-menu-item-selected {
+  background: var(--primary-gradient-soft) !important;
+  color: var(--primary) !important;
+  font-weight: 600;
+  position: relative;
+}
+.sider-menu-light .ant-menu-item-selected::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 20px;
+  background: var(--primary-gradient);
+  border-radius: 0 3px 3px 0;
+}
+
+/* ============ 标签高级样式 ============ */
+.geo-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.geo-tag-blue { background: #DBEAFE; color: #1D4ED8; }
+.geo-tag-green { background: #D1FAE5; color: #047857; }
+.geo-tag-orange { background: #FEF3C7; color: #B45309; }
+.geo-tag-red { background: #FEE2E2; color: #B91C1C; }
+.geo-tag-purple { background: #EDE9FE; color: #6D28D9; }
+.geo-tag-gray { background: #F1F5F9; color: #475569; }
+
+/* 兼容旧 tag class */
+.tag-brand { background: #DBEAFE; color: #1D4ED8; }
+.tag-tech { background: #D1FAE5; color: #047857; }
+.tag-industry { background: #FEF3C7; color: #B45309; }
+.tag-competitor { background: #FEE2E2; color: #B91C1C; }
+.tag-general { background: #F1F5F9; color: #475569; }
+
+/* ============ 按钮高级样式 ============ */
+.btn-primary-gradient {
+  background: var(--primary-gradient) !important;
+  border: none !important;
+  box-shadow: var(--shadow-primary);
+  transition: all 0.3s ease;
+  border-radius: 10px !important;
+}
+.btn-primary-gradient:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 20px rgba(37,99,235,0.35);
+}
+
+/* ============ 矩阵单元格 ============ */
+.matrix-cell {
+  text-align: center;
+  padding: 14px 8px;
+  border-radius: var(--radius-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  font-size: 14px;
+}
+
+.matrix-cell.rank-top3 {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%);
+  color: var(--success-dark);
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+.matrix-cell.rank-mid {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(245, 158, 11, 0.05) 100%);
+  color: #D97706;
+  border: 1px solid rgba(245, 158, 11, 0.2);
+}
+
+.matrix-cell.rank-none {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.03) 100%);
+  color: #DC2626;
+  border: 1px solid rgba(239, 68, 68, 0.15);
+}
+
+.matrix-cell.rank-pending {
+  background: var(--border-light);
+  color: var(--text-tertiary);
+  border: 1px dashed var(--border-color);
+}
+
+.matrix-cell:hover {
+  transform: scale(1.08);
+  box-shadow: var(--shadow-md);
+  z-index: 10;
+}
+
+/* ============ 空状态 ============ */
+.empty-state {
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-tertiary);
+}
+
+.empty-state .empty-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+/* ============ 动画 ============ */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.4s ease forwards;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(37,99,235,0); }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow 2s infinite;
+}
+
+/* ============ Ant Design 主题覆盖 ============ */
+
+/* 表格 */
+.ant-table-thead > tr > th {
+  background: var(--bg-page) !important;
+  font-weight: 600 !important;
+  color: var(--text-secondary) !important;
+  border-bottom: 2px solid var(--border-color) !important;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: rgba(37,99,235,0.03) !important;
+}
+
+/* 按钮圆角 */
+.ant-btn {
+  border-radius: 10px;
+}
+
+/* 输入框圆角 */
+.ant-input,
+.ant-input-affix-wrapper,
+.ant-select-selector {
+  border-radius: 10px !important;
+}
+
+/* Card 圆角统一 */
+.ant-card {
+  border-radius: var(--radius-lg) !important;
+}
+
+.ant-card-head {
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0 !important;
+}
+
+/* Modal 圆角 */
+.ant-modal-content {
+  border-radius: var(--radius-lg) !important;
+}
+
+/* Drawer 圆角 */
+.ant-drawer-content {
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg) !important;
+}
+
+/* Switch 主色 */
+.ant-switch-checked {
+  background: var(--primary) !important;
+}
+
+/* 侧边栏 Logo 渐变文字 */
+.sider-logo {
+  background: var(--primary-gradient);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}

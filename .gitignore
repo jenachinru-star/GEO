@@ -1,0 +1,42 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- 环境变量（含密钥，禁止提交） ----
+.env
+.env.*
+!.env.example
+
+# ---- Node / 前端 ----
+node_modules/
+dist/
+*.local
+npm-debug.log*
+pnpm-debug.log*
+
+# ---- 数据库与备份 ----
+*.db
+*.db.backup_*
+backend/data/*.sqlite*
+backend/data/*.sqlite3*
+
+# ---- 编译产物 ----
+*.exe
+*.dll
+*.so
+*.dylib
+target/
+
+# ---- IDE / 系统 ----
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
