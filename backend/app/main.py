@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+﻿from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -34,6 +34,13 @@ from app.api import (
     task_router,
     opportunity_router,
     image_router,
+    auth_local_router,
+    usage_router,
+    platforms_router,
+    upload_router,
+    asset_router,
+    asset_summary_router,
+    asset_search_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -75,6 +82,11 @@ async def lifespan(app: FastAPI):
     init_db()
     print("✅ 数据库初始化完成")
 
+    # 启动 LLM 用量日志记录器
+    from app.usage_logger import usage_logger
+    usage_logger.start()
+    print("📊 LLM 用量日志记录器已启动")
+
     worker_thread = None
 
     if APP_ROLE == "api":
@@ -111,6 +123,10 @@ async def lifespan(app: FastAPI):
             stop_worker_loop()
             worker_thread.join(timeout=5)
             print("🔄 内嵌 Worker 线程已停止")
+    # 停止 LLM 用量日志记录器
+    from app.usage_logger import usage_logger
+    usage_logger.stop()
+    print("📊 LLM 用量日志记录器已停止")
     print("👋 应用关闭")
 
 
@@ -151,6 +167,19 @@ app.include_router(distribution_router)
 app.include_router(task_router)
 app.include_router(opportunity_router)
 app.include_router(image_router)
+app.include_router(auth_local_router)
+app.include_router(usage_router)
+app.include_router(platforms_router)
+app.include_router(upload_router)
+
+# 挂载静态文件服务（上传的文件通过 /uploads/ 访问）
+from app.api.upload import mount_static_files
+mount_static_files(app)
+
+# 数字资产模块路由
+app.include_router(asset_router)
+app.include_router(asset_summary_router)
+app.include_router(asset_search_router)
 
 
 @app.get("/", summary="健康检查")

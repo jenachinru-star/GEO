@@ -1,0 +1,7 @@
+🚀 启动 GEO Monitor v1.0.0 (role=api)
+📦 环境: production
+✅ 数据库初始化完成
+🔧 已启用平台: ['glm', 'minimax']
+⏰ 定时任务已启动（每天10:00自动采集）
+🔄 内嵌 Worker 线程已启动（自动执行异步任务）
+🔄 内嵌 Worker 线程已停止

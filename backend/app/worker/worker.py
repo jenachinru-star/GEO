@@ -1,4 +1,4 @@
-"""
+﻿"""
 Worker 主进程 — 从数据库轮询 queued 状态的任务并执行。
 
 启动方式：
@@ -29,6 +29,7 @@ from app.models.task import AsyncTask
 from app.worker.task_registry import get_handler, get_all_task_types, ProgressCallback
 # 导入任务处理模块以触发注册
 import app.worker.collector_tasks  # noqa: F401
+import app.worker.asset_tasks  # noqa: F401
 
 logging.basicConfig(
     level=logging.INFO,

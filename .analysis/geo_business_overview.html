@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>GEO医疗中台 · 业务全景图</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f8fafc; color: #0f172a; padding: 24px; }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 20px; }
+
+  .pipeline { display: flex; align-items: stretch; gap: 0; margin-bottom: 20px; }
+  .col { flex: 1; padding: 14px; border-radius: 10px; }
+  .col-prod { background: #eff6ff; border: 2px solid #93c5fd; }
+  .col-pub { background: #fffbeb; border: 2px solid #fcd34d; }
+  .col-ai { background: #f0fdf4; border: 2px solid #86efac; }
+  .col h2 { font-size: 15px; margin-bottom: 10px; text-align: center; }
+  .arrow { display: flex; align-items: center; justify-content: center; width: 40px; color: #94a3b8; font-size: 24px; font-weight: bold; }
+
+  .group { margin-bottom: 12px; }
+  .group-title { font-size: 12px; font-weight: 600; color: #64748b; margin-bottom: 6px; padding-left: 4px; }
+  .items { display: flex; flex-wrap: wrap; gap: 6px; }
+  .item { font-size: 12px; padding: 6px 10px; border-radius: 6px; background: #fff; border: 1px solid #e2e8f0; }
+  .item.article { border-left: 3px solid #3b82f6; }
+  .item.video { border-left: 3px solid #8b5cf6; }
+  .item.doctor { border-left: 3px solid #10b981; }
+  .item.ai { border-left: 3px solid #f59e0b; font-weight: 500; }
+
+  .loop { background: linear-gradient(90deg,#eff6ff,#f0fdf4); border-radius: 10px; padding: 14px; border: 1px dashed #94a3b8; }
+  .loop h3 { font-size: 14px; margin-bottom: 8px; }
+  .loop-row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .metric { flex: 1; min-width: 150px; background: #fff; border-radius: 8px; padding: 10px; border: 1px solid #e2e8f0; font-size: 12px; }
+  .metric b { display: block; font-size: 13px; margin-bottom: 4px; color: #1e40af; }
+
+  .explain { margin-top: 16px; background: #fff; border-radius: 10px; padding: 16px; border: 1px solid #e2e8f0; }
+  .explain h3 { font-size: 14px; margin-bottom: 10px; }
+  .explain ol { padding-left: 20px; font-size: 13px; line-height: 1.8; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: #64748b; margin-top: 12px; flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 5px; vertical-align: middle; }
+  .legend .l-art::before { background: #3b82f6; }
+  .legend .l-vid::before { background: #8b5cf6; }
+  .legend .l-doc::before { background: #10b981; }
+  .legend .l-ai::before { background: #f59e0b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GEO 医疗中台 · 业务全景图</h1>
+  <div class="sub">一句话：你的系统不是"发内容"工具，是"让7个AI推荐你"的营销监测系统</div>
+
+  <div class="pipeline">
+    <div class="col col-prod">
+      <h2>① 内容生产</h2>
+      <div class="group">
+        <div class="group-title">文章线（现在有）</div>
+        <div class="items">
+          <span class="item article">图文文章</span>
+          <span class="item article">科普笔记</span>
+          <span class="item article">问答回答</span>
+        </div>
+      </div>
+      <div class="group">
+        <div class="group-title">视频线（现在没有，缺口）</div>
+        <div class="items">
+          <span class="item video">口播视频</span>
+          <span class="item video">科普短视频</span>
+          <span class="item video">图文转视频</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <div class="col col-pub">
+      <h2>② 发布平台</h2>
+      <div class="group">
+        <div class="group-title">文章平台</div>
+        <div class="items">
+          <span class="item article">微信公众号</span>
+          <span class="item article">小红书图文</span>
+        </div>
+      </div>
+      <div class="group">
+        <div class="group-title">视频平台</div>
+        <div class="items">
+          <span class="item video">抖音</span>
+          <span class="item video">小红书视频</span>
+          <span class="item video">视频号</span>
+        </div>
+      </div>
+      <div class="group">
+        <div class="group-title">医生专属平台（AI权重最高）</div>
+        <div class="items">
+          <span class="item doctor">好大夫在线</span>
+          <span class="item doctor">丁香医生</span>
+          <span class="item doctor">医脉通</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="arrow">→</div>
+
+    <div class="col col-ai">
+      <h2>③ AI 监测（7个"裁判"）</h2>
+      <div class="group">
+        <div class="group-title">每天自动问同样的问题，看谁提到你</div>
+        <div class="items">
+          <span class="item ai">豆包</span>
+          <span class="item ai">DeepSeek</span>
+          <span class="item ai">Kimi</span>
+          <span class="item ai">通义千问</span>
+          <span class="item ai">MiniMax</span>
+          <span class="item ai">智谱 GLM</span>
+          <span class="item ai">腾讯元宝</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="loop">
+    <h3>④ 闭环：用数据指导下一轮生产</h3>
+    <div class="loop-row">
+      <div class="metric"><b>提及率</b>7个AI里有几个提到你/你的医院？</div>
+      <div class="metric"><b>引用率</b>AI回答时引用了你的哪篇内容？带链接了吗？</div>
+      <div class="metric"><b>排名</b>AI推荐你排第几？是首推还是末尾？</div>
+      <div class="metric"><b>哪篇有效</b>发完哪篇后AI开始提你？放大它</div>
+    </div>
+  </div>
+
+  <div class="explain">
+    <h3>你为什么会混乱？三个混淆点：</h3>
+    <ol>
+      <li><b>把AI模型当成了发布平台</b>——豆包/DeepSeek/Kimi 这些是"裁判"，是被你监测的对象，你不需要"发布到豆包"，而是想让豆包回答时提到你。</li>
+      <li><b>把文章和视频当成一回事</b>——文章去公众号/小红书图文/好大夫；视频去抖音/视频号。生产工具、发布平台、AI抓取方式都不一样，不能混在一张表里。</li>
+      <li><b>不知道先发哪个</b>——按GEO价值排序：<b>医生平台（好大夫/丁香园）> 公众号 > 小红书 > 抖音</b>。AI爬虫最信任带医生资质的内容，发1篇好大夫顶10篇小红书。</li>
+    </ol>
+  </div>
+
+  <div class="legend">
+    <span class="l-art">文章类</span>
+    <span class="l-vid">视频类</span>
+    <span class="l-doc">医生专属（AI权重最高）</span>
+    <span class="l-ai">AI监测对象（不是发布平台）</span>
+  </div>
+</div>
+</body>
+</html>

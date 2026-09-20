@@ -12,6 +12,7 @@ import {
 } from '@ant-design/icons'
 import { semanticApi, articleApi, toolsApi, templateApi, distributionApi, opportunityApi } from '@/api'
 import { PUBLISH_PLATFORMS, PUBLISH_PLATFORM_NAMES, ARTICLE_STATUS_NAMES } from '@/store/useStore'
+import { formatUtcDate } from '@/utils/time'
 
 const { Title, Text } = Typography
 
@@ -340,7 +341,7 @@ const ContentHub = () => {
     },
     {
       title: '创建时间', dataIndex: 'created_at', key: 'created_at', width: 110,
-      render: (t: string) => new Date(t).toLocaleDateString()
+      render: (t: string) => formatUtcDate(t)
     },
     {
       title: '操作', key: 'action', width: 240,

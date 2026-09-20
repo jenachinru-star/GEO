@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Layout, Menu, Avatar, Dropdown, Badge, Button, Tooltip, message } from 'antd'
 import {
   DashboardOutlined,
@@ -32,6 +32,7 @@ const menuItems = [
   { key: '/distribution', icon: <SendOutlined />, label: '发布管理' },
   { key: '/data', icon: <MonitorOutlined />, label: '数据中心' },
   { key: '/tasks', icon: <SyncOutlined />, label: '任务中心' },
+  { key: '/asset', icon: <BookOutlined />, label: '数字资产' },
 ]
 
 const MainLayout = () => {

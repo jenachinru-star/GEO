@@ -1,0 +1,13 @@
+INFO:     Started server process [19776]
+INFO:     Waiting for application startup.
+2026-09-18 11:07:16,632 [INFO] worker: ==================================================
+2026-09-18 11:07:16,633 [INFO] worker: GEO Worker 启动（内嵌模式）
+INFO:     Application startup complete.
+2026-09-18 11:07:16,634 [INFO] worker: 已注册任务类型: ['geo_refresh', 'monitor_collect']
+ERROR:    [Errno 10048] error while attempting to bind on address ('0.0.0.0', 8001): [winerror 10048] 通常每个套接字地址(协议/网络地址/端口)只允许使用一次。
+2026-09-18 11:07:16,636 [INFO] worker: 轮询间隔: 3秒 | 任务超时: 600秒
+INFO:     Waiting for application shutdown.
+2026-09-18 11:07:16,638 [INFO] worker: ==================================================
+2026-09-18 11:07:16,638 [INFO] apscheduler.scheduler: Scheduler has been shut down
+2026-09-18 11:07:16,642 [INFO] worker: 收到停止信号，Worker 即将退出...
+2026-09-18 11:07:19,643 [INFO] worker: Worker 已退出

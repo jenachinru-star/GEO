@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Row, Col, Table, Tag, Button, Statistic, message, Drawer, Descriptions, Empty, Spin, Select } from 'antd'
 import { ReloadOutlined, EyeOutlined, InfoCircleOutlined, DownloadOutlined } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
-import { geoApi, exportApi } from '@/api'
+import { geoApi, exportApi, taskApi } from '@/api'
 import { PLATFORM_NAMES } from '@/store/useStore'
 
 const DataCenter = () => {
@@ -15,6 +15,14 @@ const DataCenter = () => {
   const [expandedRaw, setExpandedRaw] = useState<string | null>(null)
   const [trendDays, setTrendDays] = useState(7)
   const [trendData, setTrendData] = useState<any>(null)
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  // 组件卸载时清理轮询定时器，避免内存泄漏
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+    }
+  }, [])
 
   const loadData = async () => {
     setLoading(true)
@@ -45,14 +53,48 @@ const DataCenter = () => {
 
   const handleRefresh = async () => {
     setRefreshing(true)
+    const loadingKey = 'geo_refresh'
     try {
-      message.loading({ content: '数据采集中，可能需要1-3分钟，请稍候...', key: 'geo_refresh', duration: 0 })
       const res: any = await geoApi.refresh()
-      message.success({ content: `采集完成：${res.data.success}/${res.data.total} 个语义`, key: 'geo_refresh' })
-      loadData()
+      const taskId = res.data?.task_id
+      if (!taskId) {
+        message.warning('任务已提交，但未获取到任务ID')
+        setRefreshing(false)
+        return
+      }
+      // 后端是异步任务：POST 只返回 task_id，真正的采集在 worker 后台执行
+      // 这里只提示"已提交"，然后轮询任务状态，等任务真正完成后再报结果
+      message.loading({ content: `采集任务 #${taskId} 已提交，正在后台执行...`, key: loadingKey, duration: 0 })
+
+      let pollCount = 0
+      const maxPolls = 600 // 3秒一次 × 600次 = 30分钟上限
+      pollTimerRef.current = setInterval(async () => {
+        pollCount++
+        try {
+          const taskRes: any = await taskApi.get(taskId)
+          const task = taskRes.data
+          if (task.status === 'succeeded') {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+            const success = task.result?.success ?? 0
+            const total = task.result?.total ?? 0
+            message.success({ content: `采集完成：${success}/${total} 个语义`, key: loadingKey })
+            loadData()
+            setRefreshing(false)
+          } else if (task.status === 'failed') {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+            message.error({ content: task.error_message || '采集失败', key: loadingKey })
+            setRefreshing(false)
+          } else if (pollCount >= maxPolls) {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+            message.warning({ content: '采集任务超时，请在任务中心查看', key: loadingKey })
+            setRefreshing(false)
+          }
+        } catch (e) {
+          // 单次查询失败不中断，继续轮询
+        }
+      }, 3000)
     } catch (e: any) {
-      message.error({ content: e?.response?.data?.detail || '采集失败', key: 'geo_refresh' })
-    } finally {
+      message.error({ content: e?.response?.data?.detail || '采集失败', key: loadingKey })
       setRefreshing(false)
     }
   }

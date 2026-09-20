@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>GEO发布引擎目标架构方案</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f8fafc; color: #0f172a; padding: 24px; }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 4px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 18px; }
+  .layer { border-radius: 10px; padding: 14px; margin-bottom: 12px; border: 1px solid #e2e8f0; background: #fff; }
+  .layer-title { font-size: 13px; font-weight: 600; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .layer-title .tag { font-size: 11px; padding: 2px 8px; border-radius: 999px; font-weight: 500; }
+  .new { background: #dbeafe; color: #1d4ed8; }
+  .reuse { background: #dcfce7; color: #047857; }
+  .mid { background: #fef3c7; color: #92400e; }
+  .cards { display: flex; gap: 10px; flex-wrap: wrap; }
+  .card { flex: 1; min-width: 140px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; font-size: 12px; background: #fafbfc; }
+  .card b { display: block; font-size: 13px; margin-bottom: 4px; }
+  .card .code { font-family: ui-monospace, Consolas, monospace; font-size: 10px; color: #64748b; }
+  .card.blue { border-color: #93c5fd; background: #eff6ff; }
+  .card.green { border-color: #86efac; background: #f0fdf4; }
+  .card.amber { border-color: #fcd34d; background: #fffbeb; }
+  .card.red { border-color: #fca5a5; background: #fef2f2; }
+  .arrow { text-align: center; color: #94a3b8; font-size: 16px; margin: 4px 0; }
+  .flow { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+  .flow .step { flex: 1; text-align: center; padding: 8px; background: #eff6ff; border-radius: 8px; font-size: 12px; border: 1px solid #bfdbfe; }
+  .flow .arr { color: #3b82f6; font-weight: bold; }
+  .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 12px; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: #64748b; margin-top: 10px; flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .legend .l-new::before { background: #3b82f6; }
+  .legend .l-reuse::before { background: #10b981; }
+  .legend .l-mid::before { background: #f59e0b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GEO 发布引擎 · 目标架构方案</h1>
+  <div class="sub">核心思路：在现有代码上叠加"发布器适配层 + RPA Worker"，不推翻重写；闭环目标是 AI 引用率，不是发布成功率</div>
+
+  <!-- GEO 飞轮 -->
+  <div class="layer" style="background:linear-gradient(90deg,#eff6ff,#f0fdf4);border:none">
+    <div class="layer-title">GEO 内容飞轮 <span class="tag new">方案核心</span></div>
+    <div class="flow">
+      <div class="step">① 内容生产<br><small>AI改写/实体校验</small></div>
+      <div class="arr">→</div>
+      <div class="step">② 多平台分发<br><small>API + RPA</small></div>
+      <div class="arr">→</div>
+      <div class="step">③ AI监测回流<br><small>DeepSeek/GLM/豆包</small></div>
+      <div class="arr">→</div>
+      <div class="step">④ 优化改写<br><small>哪篇被引用就放大</small></div>
+      <div class="arr">↺</div>
+    </div>
+  </div>
+
+  <!-- 应用层 -->
+  <div class="layer">
+    <div class="layer-title">应用层（前端已有，微调）<span class="tag reuse">复用</span></div>
+    <div class="cards">
+      <div class="card green"><b>内容中心 /content</b>统一内容模型：原稿 + 各平台变体</div>
+      <div class="card green"><b>发布管理 /distribution</b>账号状态、一键分发、进度实时回传</div>
+      <div class="card green"><b>效果追踪 /effect</b>发布前后AI提及率对比（已有，保留）</div>
+    </div>
+  </div>
+
+  <div class="arrow">▼</div>
+
+  <!-- 发布引擎层（核心新增） -->
+  <div class="layer" style="border-color:#3b82f6">
+    <div class="layer-title">发布引擎层（本次新增核心）<span class="tag new">新增</span></div>
+    <div class="cards" style="margin-bottom:10px">
+      <div class="card blue">
+        <b>Publisher 统一接口</b>
+        <span class="code">publish() / check() / metrics()</span>
+        每个平台一个文件，和现有 AI adapter_factory 同构
+      </div>
+      <div class="card blue">
+        <b>合规前置审查</b>
+        LLM 按平台 rules 自动审：绝对化用语/疗效承诺/资质
+        不通过不进队列
+      </div>
+      <div class="card blue">
+        <b>账号凭证管理</b>
+        <span class="code">publish_account</span> 表
+        cookie/token 加密存储，登录态过期提醒
+      </div>
+    </div>
+    <div class="cards">
+      <div class="card amber"><b>微信公众号</b><small>官方API直连<br>draft/add → freepublish</small></div>
+      <div class="card amber"><b>百家号 / 大鱼号</b><small>RPA · Playwright<br>无官方API</small></div>
+      <div class="card amber"><b>知乎 / 小红书</b><small>RPA · Playwright<br>需登录态</small></div>
+      <div class="card amber"><b>好大夫 / 丁香园</b><small>RPA 半自动<br>医生身份敏感</small></div>
+    </div>
+  </div>
+
+  <div class="arrow">▼</div>
+
+  <!-- Worker 与基础设施 -->
+  <div class="layer">
+    <div class="layer-title">执行与基础设施层 <span class="tag mid">部分新增</span></div>
+    <div class="cards">
+      <div class="card blue">
+        <b>RPA Worker（独立进程）</b>
+        <span class="code">python worker.py</span><br>
+        轮询 AsyncTask 队列，调 Playwright<br>
+        <small>不和 FastAPI 同进程，避免阻塞</small>
+      </div>
+      <div class="card green">
+        <b>AsyncTask 队列</b><span class="tag reuse" style="font-size:10px">复用</span><br>
+        已有表 + task_type 扩展<br>
+        <span class="code">publish_dispatch</span>
+      </div>
+      <div class="card green">
+        <b>AI adapter_factory</b><span class="tag reuse" style="font-size:10px">复用</span><br>
+        改写稿、合规审查都走它
+      </div>
+      <div class="card green">
+        <b>MonitorRecord 监测</b><span class="tag reuse" style="font-size:10px">复用</span><br>
+        效果回流数据源，不动
+      </div>
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="l-new">本次新增</span>
+    <span class="l-reuse">现有代码直接复用</span>
+    <span class="l-mid">少量扩展</span>
+  </div>
+
+  <div class="note">
+    <b>关键决策：</b>① 不用 Celery+Redis（现在单机SQLite，过度设计），用现有 AsyncTask 表做队列 + 独立 worker 进程轮询；
+    ② 不做 MCP 包装（你是 Web 后台不是 AI 客户端）；
+    ③ 微信走真 API，其他走 RPA，不要试图让所有平台都走 API；
+    ④ 医疗合规审查下沉到后端 publisher 定义里，不是前端硬编码。
+  </div>
+</div>
+</body>
+</html>

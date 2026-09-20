@@ -102,3 +102,48 @@ class OpenAICompatibleAdapter(BaseAdapter):
 
     def get_platform_code(self) -> str:
         return self.platform_code
+
+    def query_stream(self, question: str, system_prompt: Optional[str] = None):
+        """流式查询，yield每个token片段
+
+        返回生成器，yield (text_chunk, is_finished, usage_info)
+        """
+        try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": question})
+
+            stream = self.client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                temperature=self.temperature,
+                max_tokens=self.max_tokens,
+                stream=True,
+                stream_options={"include_usage": True}
+            )
+
+            full_answer = ""
+            for chunk in stream:
+                if not chunk.choices:
+                    # 可能是usage chunk
+                    if hasattr(chunk, 'usage') and chunk.usage:
+                        yield ("", False, {
+                            "tokens_input": chunk.usage.prompt_tokens or 0,
+                            "tokens_output": chunk.usage.completion_tokens or 0,
+                        })
+                    continue
+
+                delta = chunk.choices[0].delta
+                content = getattr(delta, 'content', None)
+
+                if content:
+                    full_answer += content
+                    yield (content, False, None)
+
+            # 最后一个chunk：完成标记
+            yield ("", True, None)
+
+        except Exception as e:
+            logger.error(f"{self.platform_code}流式调用异常: {e}")
+            yield (f"[流式错误: {str(e)}]", True, None)

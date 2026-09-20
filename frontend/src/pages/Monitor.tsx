@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   Row, Col, Card, Table, Tag, Button, Space, Input, Select,
   Modal, Form, Drawer, Descriptions, message, Popconfirm, Tooltip
@@ -9,7 +9,7 @@ import {
   CheckCircleOutlined, ClockCircleOutlined
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
-import { monitorApi, exportApi, systemApi } from '@/api'
+import { monitorApi, exportApi, systemApi, taskApi } from '@/api'
 import { PLATFORM_NAMES, CATEGORY_NAMES } from '@/store/useStore'
 
 const Monitor = () => {
@@ -24,6 +24,13 @@ const Monitor = () => {
   const [trendData, setTrendData] = useState<any[]>([])
   const [form] = Form.useForm()
   const [filters, setFilters] = useState({ category: '', keyword: '' })
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+    }
+  }, [])
 
   const loadPlatforms = async () => {
     try {
@@ -65,12 +72,48 @@ const Monitor = () => {
 
   const handleCollect = async (questionId?: number) => {
     setCollectLoading(true)
+    const loadingKey = 'monitor_collect'
     try {
       const res: any = await monitorApi.collect({ question_id: questionId, detect_round: 1 })
-      message.success(`采集完成：${res.data.success}/${res.data.total} 个问题`)
-      loadMatrix()
-      loadQuestions()
-    } finally {
+      const taskId = res.data?.task_id
+      if (!taskId) {
+        message.warning('任务已提交，但未获取到任务ID')
+        setCollectLoading(false)
+        return
+      }
+      // /monitor/collect 是异步任务：POST 只返回 task_id，采集在 worker 后台执行
+      message.loading({ content: `采集任务 #${taskId} 已提交，正在后台执行...`, key: loadingKey, duration: 0 })
+
+      let pollCount = 0
+      const maxPolls = 600
+      pollTimerRef.current = setInterval(async () => {
+        pollCount++
+        try {
+          const taskRes: any = await taskApi.get(taskId)
+          const task = taskRes.data
+          if (task.status === 'succeeded') {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+            const success = task.result?.success ?? 0
+            const total = task.result?.total ?? 0
+            message.success({ content: `采集完成：${success}/${total} 个问题`, key: loadingKey })
+            loadMatrix()
+            loadQuestions()
+            setCollectLoading(false)
+          } else if (task.status === 'failed') {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+            message.error({ content: task.error_message || '采集失败', key: loadingKey })
+            setCollectLoading(false)
+          } else if (pollCount >= maxPolls) {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current)
+            message.warning({ content: '采集任务超时，请在任务中心查看', key: loadingKey })
+            setCollectLoading(false)
+          }
+        } catch (e) {
+          // 单次查询失败不中断
+        }
+      }, 3000)
+    } catch (e: any) {
+      message.error({ content: e?.response?.data?.detail || '采集失败', key: loadingKey })
       setCollectLoading(false)
     }
   }

@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons'
 import { knowledgeApi } from '@/api'
 import { CATEGORY_NAMES } from '@/store/useStore'
+import { formatUtcTime } from '@/utils/time'
 
 const categoryTree = [
   { title: '全部', key: '' },
@@ -127,7 +128,7 @@ const Knowledge = () => {
     { title: '版本', dataIndex: 'version', key: 'version', width: 60 },
     {
       title: '更新时间', dataIndex: 'updated_at', key: 'updated_at', width: 170,
-      render: (t: string) => t ? new Date(t).toLocaleString('zh-CN') : '-'
+      render: (t: string) => t ? formatUtcTime(t) : '-'
     },
     {
       title: '操作', key: 'action', width: 120,

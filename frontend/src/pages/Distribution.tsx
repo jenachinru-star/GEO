@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { formatUtcTime } from '@/utils/time'
 import {
   Table, Button, Space, Tag, Modal, Form, Select, Input,
   message, Popconfirm, Statistic, Row, Col, Drawer, Descriptions,
@@ -413,7 +414,7 @@ const Distribution = () => {
               </Descriptions.Item>
               <Descriptions.Item label="发布模式">{currentRecord.publish_mode === 'manual' ? '手动发布' : '自动发布'}</Descriptions.Item>
               <Descriptions.Item label="重试次数">{currentRecord.retry_count}</Descriptions.Item>
-              <Descriptions.Item label="创建时间">{currentRecord.created_at ? new Date(currentRecord.created_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
+              <Descriptions.Item label="创建时间">{currentRecord.created_at ? formatUtcTime(currentRecord.created_at) : '-'}</Descriptions.Item>
               <Descriptions.Item label="排期时间">{currentRecord.scheduled_at ? new Date(currentRecord.scheduled_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
               <Descriptions.Item label="发布时间">{currentRecord.published_at ? new Date(currentRecord.published_at).toLocaleString('zh-CN') : '-'}</Descriptions.Item>
               <Descriptions.Item label="发布链接">
@@ -433,7 +434,7 @@ const Distribution = () => {
               <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 12 }}>状态流转时间线</div>
               <Timeline
                 items={[
-                  { color: 'blue', children: `创建记录 - ${currentRecord.created_at ? new Date(currentRecord.created_at).toLocaleString('zh-CN') : '-'}` },
+                  { color: 'blue', children: `创建记录 - ${currentRecord.created_at ? formatUtcTime(currentRecord.created_at) : '-'}` },
                   currentRecord.scheduled_at && { color: 'blue', children: `排期 - ${new Date(currentRecord.scheduled_at).toLocaleString('zh-CN')}` },
                   currentRecord.published_at && { color: 'green', children: `发布完成 - ${new Date(currentRecord.published_at).toLocaleString('zh-CN')}` },
                   currentRecord.status === 'failed' && { color: 'red', children: `发布失败 - ${currentRecord.failed_reason || '未知原因'}` },

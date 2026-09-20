@@ -1,4 +1,4 @@
-from app.models.platform import Platform
+﻿from app.models.platform import Platform
 from app.models.question import Question
 from app.models.monitor import MonitorRecord
 from app.models.content import Content
@@ -14,6 +14,23 @@ from app.models.subscription import Subscription
 from app.models.workspace import Workspace, WorkspaceMember
 from app.models.task import AsyncTask
 from app.models.content_opportunity import ContentOpportunity
+
+# ===== 数字资产模块 =====
+from app.models.asset import (
+    AssetSource,
+    AssetDocument,
+    AssetChunk,
+    AssetNote,
+    AssetGenerated,
+    PubMedCache,
+    AssetChatSession,
+    AssetChatMessage,
+    AssetPublished,
+    AssetFolder,
+)
+
+# ===== 发布模块 =====
+from app.models.publish_account import PublishAccount
 
 __all__ = [
     "Platform",
@@ -32,4 +49,17 @@ __all__ = [
     "WorkspaceMember",
     "AsyncTask",
     "ContentOpportunity",
+    # 数字资产模块
+    "AssetSource",
+    "AssetDocument",
+    "AssetChunk",
+    "AssetNote",
+    "AssetGenerated",
+    "PubMedCache",
+    "AssetChatSession",
+    "AssetChatMessage",
+    "AssetPublished",
+    "AssetFolder",
+    # 发布模块
+    "PublishAccount",
 ]

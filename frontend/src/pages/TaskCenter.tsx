@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Table, Tag, Progress, Button, Space, Card, Typography, Empty, Badge, message, Tooltip } from 'antd'
 import { ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons'
 import { taskApi } from '@/api'
+import { formatUtcTime as formatTime } from '@/utils/time'
 
 const { Title } = Typography
 
@@ -124,7 +125,7 @@ const TaskCenter = () => {
       title: '创建时间',
       dataIndex: 'created_at',
       width: 170,
-      render: (t: string) => t ? new Date(t).toLocaleString('zh-CN') : '-',
+      render: (t: string) => formatTime(t),
     },
     {
       title: '操作',

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>GEO中台「内容中心 / 发布管理」现状数据流</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f8fafc; color: #0f172a; padding: 24px; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 6px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 20px; }
+  .row { display: flex; gap: 14px; margin-bottom: 14px; flex-wrap: wrap; }
+  .lane { flex: 1; min-width: 300px; background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; }
+  .lane h3 { font-size: 14px; padding-bottom: 8px; border-bottom: 2px solid; margin-bottom: 10px; }
+  .lane.create h3 { border-color: #3b82f6; color: #1d4ed8; }
+  .lane.dist h3 { border-color: #f59e0b; color: #b45309; }
+  .lane.effect h3 { border-color: #10b981; color: #047857; }
+  .box { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; font-size: 13px; background: #fafbfc; }
+  .box b { display: block; font-size: 13px; margin-bottom: 3px; }
+  .box .code { font-family: ui-monospace, Consolas, monospace; font-size: 11px; color: #64748b; background: #f1f5f9; padding: 1px 5px; border-radius: 3px; }
+  .box.red { border-color: #fecaca; background: #fef2f2; }
+  .box.red b { color: #b91c1c; }
+  .box.green { border-color: #bbf7d0; background: #f0fdf4; }
+  .arrow { text-align: center; color: #94a3b8; font-size: 18px; margin: 2px 0; }
+  .external { background: #fffbeb; border: 2px dashed #f59e0b; border-radius: 10px; padding: 14px; }
+  .external h3 { color: #b45309; font-size: 14px; margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { font-size: 12px; padding: 4px 10px; border-radius: 999px; background: #fff; border: 1px solid #e2e8f0; color: #475569; }
+  .chip.off { border-color: #fca5a5; color: #b91c1c; background: #fef2f2; text-decoration: line-through; }
+  .legend { display: flex; gap: 16px; font-size: 12px; color: #64748b; margin-top: 10px; flex-wrap: wrap; }
+  .legend span::before { content: ""; display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .legend .l-ok::before { background: #10b981; }
+  .legend .l-warn::before { background: #f59e0b; }
+  .legend .l-bad::before { background: #ef4444; }
+  .note { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 10px 14px; border-radius: 6px; font-size: 13px; margin-top: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GEO中台「内容中心 / 发布管理」现状数据流</h1>
+  <div class="sub">按实际前端 + 后端代码绘制（基于 ContentHub.tsx / Distribution.tsx / article.py / distribution.py / asset_publish.py）</div>
+
+  <div class="row">
+    <div class="lane create">
+      <h3>① 内容中心 ContentHub（/content）</h3>
+      <div class="box">
+        <b>创作工作台</b>
+        选监测语义 → 拼URL → <span class="code">window.open()</span> 跳到<b>外部文章工具</b><br>
+        <span class="code">ops.szcczh.com/paper-next/</span>、<span class="code">video.szcczh.com</span><br>
+        <small style="color:#64748b">本系统不生成文章，只是个跳转入口</small>
+      </div>
+      <div class="box">
+        <b>文章草稿表 ArticleDraft</b>
+        <span class="code">/api/v1/article</span> CRUD<br>
+        关联 semantic_id，自动跑 <b>实体一致性校验</b>（医生头衔/医院/职称）
+      </div>
+      <div class="box">
+        <b>内容机会 opportunityApi</b>
+        AI未提及 / 缺引用 / 排名靠后 → 给写作建议
+      </div>
+      <div class="arrow">▼ 写完回来登记</div>
+    </div>
+
+    <div class="lane dist">
+      <h3>② 发布管理 Distribution（/distribution）</h3>
+      <div class="box">
+        <b>ArticleDistribution 状态机</b>
+        <span class="code">/api/v1/distribution</span><br>
+        draft → scheduled → processing → published / failed → removed<br>
+        <small>状态流转全部由人点按钮触发</small>
+      </div>
+      <div class="box red">
+        <b>⚠ 关键断点：没有外部API调用</b>
+        点"标记已发布"弹窗原文：<br>
+        <i>"请确认已在「XX平台」手动发布了这篇文章"</i><br>
+        publish_url = <b>人工粘贴</b><br>
+        external_task_id 字段已建但全代码无人使用
+      </div>
+      <div class="box">
+        <b>科普发布线 AssetPublished（asset_publish.py）</b>
+        从知识库文档 → GLM改写 → 存草稿<br>
+        "保存即发布" = 本地 status 改 published，同样不发往外部
+      </div>
+      <div class="arrow">▼ 人工去平台发完 → 回来贴链接</div>
+    </div>
+
+    <div class="lane effect">
+      <h3>③ 效果闭环（唯一有真实价值的部分）</h3>
+      <div class="box green">
+        <b>effect 接口</b> <span class="code">/distribution/{id}/effect</span><br>
+        按 published_at 切分 MonitorRecord：<br>
+        · 发布前提及率/引用率/平均排名<br>
+        · 发布后同名指标<br>
+        · 30天趋势对比
+      </div>
+      <div class="box green">
+        <b>recollect 接口</b><br>
+        触发 monitor_collect 异步任务重新采集，验证AI是否开始引用
+      </div>
+      <div class="arrow" style="color:#10b981">↑ 数据回流，闭环成立</div>
+    </div>
+  </div>
+
+  <div class="external">
+    <h3>③ 外部发布平台（当前对接状态）</h3>
+    <div class="chips">
+      <span class="chip off">百家号</span>
+      <span class="chip off">大鱼号</span>
+      <span class="chip off">企鹅号</span>
+      <span class="chip off">搜狐号</span>
+      <span class="chip off">网易号</span>
+      <span class="chip off">微信公众号</span>
+      <span class="chip off">知乎</span>
+      <span class="chip off">小红书</span>
+      <span class="chip off">豆瓣</span>
+      <span class="chip off">脉脉</span>
+      <span class="chip off">好大夫</span>
+      <span class="chip off">丁香园</span>
+      <span class="chip off">医脉通</span>
+      <span class="chip off">寻医问药</span>
+    </div>
+    <div style="font-size:12px;color:#92400e;margin-top:8px">
+      这些平台清单目前是前端硬编码常量（useStore.ts 里的 PUBLISH_PLATFORMS），只用于打标签和展示合规规则，<b>没有一个有真实的接口调用代码</b>。
+    </div>
+  </div>
+
+  <div class="legend">
+    <span class="l-ok">已实现且有真实数据流</span>
+    <span class="l-warn">半人工（登记/跳转）</span>
+    <span class="l-bad">未对接，依赖人工操作</span>
+  </div>
+
+  <div class="note">
+    <b>一句话现状：</b>这是一个"GEO监测 + 内容管理 + 发布登记台账"系统，不是"一键分发系统"。
+    真正的发布动作 100% 在系统外完成。
+  </div>
+</div>
+</body>
+</html>

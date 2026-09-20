@@ -34,6 +34,7 @@ def get_db():
 def init_db():
     """初始化数据库表"""
     from app.models import platform, question, monitor, content, knowledge, competitor, user, doctor, semantic, article, subscription, distribution
+    from app.models import asset  # 数字资产模块
     Base.metadata.create_all(bind=engine)
     # 迁移：geo_monitor_record 加 GEO/AEO 字段
     with engine.connect() as conn:
