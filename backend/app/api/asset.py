@@ -9,6 +9,7 @@ import uuid
 import logging
 from fastapi import APIRouter, Depends, Query, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
+from sqlalchemy import select
 from sqlalchemy import or_
 from typing import Optional
 from pydantic import BaseModel

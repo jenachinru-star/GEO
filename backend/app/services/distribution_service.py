@@ -1,4 +1,4 @@
-"""
+﻿"""
 Distribution 状态机服务 — 管理文章分发记录的状态流转。
 
 状态流转图：
@@ -7,10 +7,12 @@ Distribution 状态机服务 — 管理文章分发记录的状态流转。
     published → removed
 """
 import logging
+import json
 from datetime import datetime
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.models.distribution import ArticleDistribution
+from app.models.task import AsyncTask
 
 logger = logging.getLogger(__name__)
 
@@ -71,6 +73,9 @@ class DistributionService:
             dist.publish_url = publish_url or dist.publish_url
             dist.published_at = datetime.now()
             dist.verified_at = None  # 待验证
+
+            # 发布成功后自动触发效果监测（7天后再采集对比）
+            _auto_trigger_effect_monitor(db, dist)
         elif target_status == "failed":
             dist.failed_reason = note[:500] if note else dist.failed_reason
         elif target_status == "removed":
@@ -117,3 +122,38 @@ class DistributionService:
     def remove(db: Session, dist: ArticleDistribution) -> ArticleDistribution:
         """移除（软删除，不实际删除记录）"""
         return DistributionService.transition(db, dist, "removed", note="移除记录")
+
+
+def _auto_trigger_effect_monitor(db: Session, dist: ArticleDistribution):
+    """发布成功后自动触发效果监测任务
+
+    策略：创建一个异步任务，自动重新采集，用于对比发布前后的AI提及率变化
+    """
+    try:
+        from app.models.article import ArticleDraft
+
+        article = db.query(ArticleDraft).filter(ArticleDraft.id == dist.article_id).first()
+        if not article or not article.semantic_id:
+            logger.info(f"分发记录 #{dist.id} 无关联文章或语义，跳过自动监测")
+            return
+
+        task = AsyncTask(
+            workspace_id=None,
+            task_type="monitor_collect",
+            status="queued",
+            progress=0,
+            progress_message="等待执行（发布后效果监测）",
+            payload_json=json.dumps({
+                "question_id": article.semantic_id,
+                "detect_round": 99,
+                "distribution_id": dist.id,
+                "trigger_reason": "after_publish_effect_monitor"
+            }),
+            created_by=dist.user_id,
+        )
+        db.add(task)
+        db.commit()
+        logger.info(f"分发记录 #{dist.id} 已自动创建效果监测任务 task_id={task.id}")
+    except Exception as e:
+        logger.error(f"自动触发效果监测失败: {e}")
+

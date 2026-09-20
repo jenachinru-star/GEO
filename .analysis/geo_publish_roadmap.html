@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>GEO发布引擎 · 分阶段落地方案</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; background: #f8fafc; color: #0f172a; padding: 24px; }
+  .wrap { max-width: 1100px; margin: 0 auto; }
+  h1 { font-size: 22px; margin-bottom: 6px; }
+  .sub { color: #64748b; font-size: 13px; margin-bottom: 20px; }
+
+  .phase { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 18px; margin-bottom: 14px; }
+  .phase.done { border-left: 4px solid #10b981; }
+  .phase.now { border-left: 4px solid #3b82f6; background: #eff6ff; }
+  .phase.next { border-left: 4px solid #f59e0b; }
+  .phase.future { border-left: 4px solid #94a3b8; }
+
+  .phase-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+  .phase-title { font-size: 16px; font-weight: 700; }
+  .phase-tag { font-size: 11px; padding: 3px 10px; border-radius: 999px; font-weight: 500; }
+  .tag-done { background: #dcfce7; color: #047857; }
+  .tag-now { background: #dbeafe; color: #1d4ed8; }
+  .tag-next { background: #fef3c7; color: #92400e; }
+  .tag-future { background: #f1f5f9; color: #64748b; }
+
+  .goal { font-size: 13px; color: #475569; margin-bottom: 12px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; }
+  .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .item { font-size: 13px; padding: 10px; background: #fafbfc; border: 1px solid #e2e8f0; border-radius: 8px; }
+  .item b { display: block; margin-bottom: 4px; color: #1e40af; }
+  .item .status { font-size: 11px; color: #64748b; }
+
+  .recommend { background: linear-gradient(90deg, #eff6ff, #f0fdf4); border-radius: 12px; padding: 18px; margin-top: 16px; border: 2px solid #3b82f6; }
+  .recommend h3 { font-size: 15px; margin-bottom: 10px; color: #1e40af; }
+  .recommend p { font-size: 13px; line-height: 1.8; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GEO 发布引擎 · 分阶段落地方案</h1>
+  <div class="sub">核心思路：不追求"全自动14平台"，先跑通"半自动闭环 → 真API → GEO差异化"三步</div>
+
+  <div class="phase done">
+    <div class="phase-header">
+      <div class="phase-title">Phase 0 · 基础设施</div>
+      <span class="phase-tag tag-done">已完成</span>
+    </div>
+    <div class="goal">目标：AI监测 + 内容生产 + 发布骨架</div>
+    <div class="items">
+      <div class="item"><b>AI监测</b><span class="status">DeepSeek / GLM / MiniMax / 豆包 ✅</span></div>
+      <div class="item"><b>内容生产</b><span class="status">文本 / Seedream生图 / Seedance生视频 ✅</span></div>
+      <div class="item"><b>发布骨架</b><span class="status">publishers/ + manual兜底 ✅</span></div>
+      <div class="item"><b>一键复制</b><span class="status">复制标题正文 + 跳转创作页 ✅</span></div>
+    </div>
+  </div>
+
+  <div class="phase now">
+    <div class="phase-header">
+      <div class="phase-title">Phase 1 · 半自动闭环</div>
+      <span class="phase-tag tag-now">现在做（2周）</span>
+    </div>
+    <div class="goal">目标：发完能追踪，不用手动贴链接，数据自动回流</div>
+    <div class="items">
+      <div class="item"><b>发布账号管理</b><span class="status">publish_account 表 + CRUD ✅ 骨架已做</span></div>
+      <div class="item"><b>发布后自动回填</b><span class="status">贴URL后自动关联 → 触发GEO效果监测</span></div>
+      <div class="item"><b>效果追踪面板</b><span class="status">发布前后AI提及率对比（已有 effect 接口）</span></div>
+      <div class="item"><b>发布日历看板</b><span class="status">内容×平台矩阵的甘特图视图</span></div>
+      <div class="item"><b>合规前置审查</b><span class="status">发布前LLM按平台规则自动检测</span></div>
+    </div>
+  </div>
+
+  <div class="phase next">
+    <div class="phase-header">
+      <div class="phase-title">Phase 2 · 真API接入</div>
+      <span class="phase-tag tag-next">下一阶段（1~2月）</span>
+    </div>
+    <div class="goal">目标：从"半自动"升级到"真一键发"</div>
+    <div class="items">
+      <div class="item"><b>微信公众号</b><span class="status">官方API直连（草稿箱→发布）</span></div>
+      <div class="item"><b>百家号RPA</b><span class="status">Playwright + Cookie池</span></div>
+      <div class="item"><b>知乎RPA</b><span class="status">Playwright，问答型内容优势大</span></div>
+      <div class="item"><b>RPA Worker</b><span class="status">独立进程，不阻塞API服务</span></div>
+      <div class="item"><b>登录态监控</b><span class="status">过期自动提醒，失败自动重试</span></div>
+    </div>
+  </div>
+
+  <div class="phase future">
+    <div class="phase-header">
+      <div class="phase-title">Phase 3 · GEO差异化（护城河）</div>
+      <span class="phase-tag tag-future">长期（2~3月）</span>
+    </div>
+    <div class="goal">目标：和融媒宝/易媒助手拉开差距的核心能力</div>
+    <div class="items">
+      <div class="item"><b>平台差异化改写</b><span class="status">同一篇文章按平台调性出变体稿</span></div>
+      <div class="item"><b>发布后自动巡检</b><span class="status">去各平台搜标题，自动回链URL</span></div>
+      <div class="item"><b>数据回流</b><span class="status">抓取阅读量/点赞，和GEO曝光联合分析</span></div>
+      <div class="item"><b>效果归因</b><span class="status">哪篇内容→哪个平台→AI开始引用，闭环</span></div>
+      <div class="item"><b>视频自动化</b><span class="status">文案→Seedance视频→自动发布到抖音</span></div>
+    </div>
+  </div>
+
+  <div class="recommend">
+    <h3>我的推荐：现在立刻做 Phase 1</h3>
+    <p>
+      <b>为什么不直接做 RPA？</b>因为 RPA 稳定性差、维护成本高，你现在还没验证"发内容→AI引用"这个闭环是不是真的有效。<br><br>
+      <b>Phase 1 的价值：</b>用最简单的方式（半自动）验证整个 GEO 闭环——发10篇文章到5个平台，7天后看AI提及率涨了多少。如果有效，再投入做 RPA；如果没效果，说明问题不在发布渠道，而在内容质量或监测方法。<br><br>
+      <b>Phase 1 具体做什么：</b>把"一键复制"升级成"发完贴URL→自动触发监测→7天后看效果对比"。这一步做完，你就有了一个完整的、可验证的 GEO 闭环，不需要任何 RPA。
+    </p>
+  </div>
+</div>
+</body>
+</html>

@@ -29,6 +29,8 @@ const AssetDetail = () => {
   const [summaryLoading, setSummaryLoading] = useState(false)
   const [publishLoading, setPublishLoading] = useState(false)
   const [exportLoading, setExportLoading] = useState('')
+  const [allTags, setAllTags] = useState<any[]>([])
+  const [currentTagIds, setCurrentTagIds] = useState<number[]>([])
 
   // 对话状态
   const [chatModels, setChatModels] = useState<any[]>([])
@@ -750,7 +752,20 @@ const AssetDetail = () => {
                 <p><Text type="secondary">标题：</Text>{detail.title}</p>
                 <p><Text type="secondary">来源URL：</Text>{detail.url || '-'}</p>
                 <p><Text type="secondary">分类：</Text>{detail.category || '-'}</p>
-                <p><Text type="secondary">标签：</Text>{detail.tags || '-'}</p>
+                <div style={{ marginBottom: 12 }}>
+                  <Text type="secondary">标签：</Text>
+                  <Select
+                    mode="multiple"
+                    style={{ width: '100%', marginTop: 8 }}
+                    placeholder="选择标签"
+                    value={currentTagIds}
+                    onChange={handleTagChange}
+                    options={allTags.map((t: any) => ({
+                      value: t.id,
+                      label: t.name,
+                    }))}
+                  />
+                </div>
                 <p><Text type="secondary">创建时间：</Text>{detail.created_at ? formatUtcTime(detail.created_at) : '-'}</p>
                 <p><Text type="secondary">更新时间：</Text>{detail.updated_at ? formatUtcTime(detail.updated_at) : '-'}</p>
               </Card>

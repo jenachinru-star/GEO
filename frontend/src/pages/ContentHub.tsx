@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+﻿import { useEffect, useState } from 'react'
 import {
   Row, Col, Button, Select, Modal, Form, Input,
   message, Space, Tag, Empty, Typography, Table,
@@ -250,6 +250,42 @@ const ContentHub = () => {
     await distributionApi.delete(id)
     message.success('已删除')
     loadDistributions(detail.id)
+  }
+
+  const handleCopyToPublish = (article: any) => {
+    const text = `${article.title}\n\n${article.content || ''}`
+    navigator.clipboard.writeText(text).then(() => {
+      message.success('已复制标题和正文，请选择发布平台')
+      const createUrls: Record<string, string> = {
+        baijiahao: 'https://baijiahao.baidu.com',
+        wechat: 'https://mp.weixin.qq.com',
+        zhihu: 'https://zhuanlan.zhihu.com/write',
+        xiaohongshu: 'https://creator.xiaohongshu.com/publish/publish',
+        douyin: 'https://creator.douyin.com',
+      }
+      Modal.info({
+        title: '已复制内容，选择平台打开创作页',
+        content: (
+          <div style={{ marginTop: 16 }}>
+            {Object.entries(createUrls).map(([code, url]) => (
+              <Button
+                key={code}
+                style={{ margin: '0 8px 8px 0' }}
+                onClick={() => {
+                  window.open(url, '_blank')
+                  Modal.destroyAll()
+                }}
+              >
+                {PUBLISH_PLATFORM_NAMES[code] || code}
+              </Button>
+            ))}
+          </div>
+        ),
+        okText: '关闭',
+      })
+    }).catch(() => {
+      message.error('复制失败，请手动复制')
+    })
   }
 
   const handleValidate = async (id: number) => {
@@ -941,3 +977,6 @@ const ContentHub = () => {
 }
 
 export default ContentHub
+
+
+

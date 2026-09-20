@@ -41,6 +41,8 @@ from app.api import (
     asset_router,
     asset_summary_router,
     asset_search_router,
+    video_router,
+    publish_account_router,
 )
 
 logger = logging.getLogger(__name__)
@@ -181,6 +183,10 @@ app.include_router(asset_router)
 app.include_router(asset_summary_router)
 app.include_router(asset_search_router)
 
+# 新增模块路由
+app.include_router(video_router)
+app.include_router(publish_account_router)
+
 
 @app.get("/", summary="健康检查")
 def health_check():
@@ -214,3 +220,4 @@ if __name__ == "__main__":
             port=settings.PORT,
             reload=settings.DEBUG
         )
+

@@ -32,6 +32,11 @@ from app.api.asset_pubmed import router as asset_pubmed_router
 from app.api.asset_publish import router as asset_publish_router
 from app.api.asset_export import router as asset_export_router
 from app.api.asset_folder import router as asset_folder_router
+from app.api.asset_tag import router as asset_tag_router
+
+# ===== 新增模块 =====
+from app.api.video import router as video_router
+from app.api.publish_account import router as publish_account_router
 
 __all__ = [
     "monitor_router",
@@ -67,4 +72,9 @@ __all__ = [
     "asset_publish_router",
     "asset_export_router",
     "asset_folder_router",
+    "asset_tag_router",
+    # 新增模块
+    "video_router",
+    "publish_account_router",
 ]
+

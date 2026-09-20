@@ -21,6 +21,7 @@ const Distribution = lazy(() => import('@/pages/Distribution'))
 const AssetHub = lazy(() => import('@/pages/AssetHub'))
 const AssetDetail = lazy(() => import('@/pages/AssetDetail'))
 const PublishedList = lazy(() => import('@/pages/PublishedList'))
+const PublishAccounts = lazy(() => import('@/pages/PublishAccounts'))
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAppStore()
@@ -52,6 +53,7 @@ const AppRouter = () => {
           <Route path="tasks" element={<RequireAuth><TaskCenter /></RequireAuth>} />
           <Route path="asset" element={<RequireAuth><AssetHub /></RequireAuth>} />
           <Route path="asset/:id" element={<RequireAuth><AssetDetail /></RequireAuth>} />
+          <Route path="publish-accounts" element={<RequireAuth><PublishAccounts /></RequireAuth>} />
         </Route>
       </Routes>
     </Suspense>

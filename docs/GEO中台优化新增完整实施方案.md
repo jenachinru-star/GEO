@@ -1418,73 +1418,377 @@ geo-score 只做检测不做修复。工作目录可以新增"从诊断到修复
 
 ---
 
-### 模块七：告警与通知系统（P1，4-5 人天）
+### 模块七：告警与通知系统（P1，5-6 人天）
 
-#### 2.7.1 告警规则设计
+#### 2.7.1 模块定位与整体思路
 
-| 告警类型 | 触发条件 | 严重级别 | 通知渠道 |
-|---------|---------|---------|---------|
-| 门控状态变化 | 品牌官网从"门控通过"变为"门控为0"（robots被改/网站不可达/SSR失效） | P0 紧急 | 邮件+飞书+钉钉 |
-| 评分骤降 | GEO就绪度评分单次下降 ≥10 分 | P1 高 | 邮件+飞书 |
-| 竞品反超 | 竞品评分超过本企业 | P2 中 | 飞书 |
-| 提及率异常 | 某问题提及率从 ≥60% 降到 ≤20% | P1 高 | 邮件+飞书 |
-| 采集失败率高 | 当天采集失败率 ≥30% | P2 中 | 飞书 |
-| 内容质量下降 | 新录入内容 GEO 质量分 <15/45 | P3 低 | 系统内通知 |
+**要解决的问题**：当前系统所有异常都需要用户主动打开仪表盘才能发现。告警模块的目标是——**系统主动发现异常并推送给用户**，把问题发现时间从"1-3周后复盘"缩短到"24小时内拦截"。
 
-#### 2.7.2 数据模型
+**核心设计原则**：
+1. **按优先级分发渠道**：P0/P1 紧急告警走邮件（即时），P2/P3 走系统内通知（不打扰），不搞全员轰炸
+2. **不重复告警**：同一问题在静默期内不重复发送，避免告警疲劳
+3. **可配置**：每个告警规则可独立开关、可调整阈值，不是写死的
+4. **可追溯**：所有告警都存在数据库里，带状态流转（open → acknowledged → resolved），方便复盘
+5. **渠道可扩展**：第一版只做邮件+系统内通知，邮件引擎预留接口，后面加飞书/企业微信/短信只需加一个 sender 实现
+
+**整体架构**：
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    告警检测引擎（alert_engine）                │
+│                                                             │
+│  事件触发（扫描完成/采集完成/内容入库后）                      │
+│     │                                                       │
+│     ├─ check_gate_change()        → 门控状态变化（P0）       │
+│     ├─ check_score_drop()         → 评分骤降（P1）           │
+│     ├─ check_mention_anomaly()    → 提及率异常（P1）         │
+│     ├─ check_collection_failure() → 采集失败率（P2）         │
+│     ├─ check_competitor_overtake()→ 竞品反超（P2）           │
+│     └─ check_content_quality()    → 新内容低分（P3）          │
+│                                                             │
+│     每个检测函数：对比数据 → 判断是否超阈值 → 生成 AlertEvent  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    优先级路由（router）                       │
+│                                                             │
+│  P0 → 邮件即时发送 + 系统内通知（置顶红点）                    │
+│  P1 → 邮件即时发送 + 系统内通知                              │
+│  P2 → 系统内通知 + 次日早间汇总邮件                          │
+│  P3 → 系统内通知，攒入每日运营日报                           │
+│                                                             │
+│  去重逻辑：同一 rule_type + 同一关联对象，在静默期内不重复触发  │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+              ┌────────────┼────────────┐
+              ▼            ▼            ▼
+        ┌─────────┐  ┌──────────┐  ┌──────────────┐
+        │邮件发送  │  │系统内通知 │  │（预留：飞书/  │
+        │email.py │  │数据库写入 │  │企业微信/短信）│
+        └─────────┘  └──────────┘  └──────────────┘
+```
+
+#### 2.7.2 六类告警的详细定义
+
+每类告警都明确：**触发条件、检测方法、业务场景举例、严重级别、通知渠道、静默时长**。
+
+---
+
+**告警类型 1：门控状态变化（gate_change）— P0 紧急**
+
+| 项目 | 说明 |
+|------|------|
+| **触发条件** | 品牌官网最新一次扫描中，3 个门控项（g.robots / g.reachable / g.ssr）任意一个从"非 0 分"变为"0 分" |
+| **检测方法** | 每次 site_audit 扫描完成后，取该 root_origin 的上一次扫描记录，对比 gate_capped 字段和 3 个门控检查项的 scored_points。如果上次 gate_capped=false 且本次 gate_capped=true，或上次某门控项>0 本次=0，则触发 |
+| **为什么紧急** | 门控为 0 意味着 AI 爬虫完全拿不到内容，其他所有优化全部无效，这是 GEO 的地基 |
+| **业务举例** | 网站改版丢了 SSR、运维改 robots.txt 封了爬虫、服务器宕机返回 503、CDN WAF 按 UA 拦截了 GPTBot |
+| **严重级别** | **P0** |
+| **通知渠道** | 邮件即时发送（红色标题"紧急"）+ 系统内通知（置顶红点） |
+| **静默时长** | 24 小时（同一网站 24 小时内不重复告警） |
+| **邮件标题** | 【P0 紧急】{品牌名}官网 GEO 门控异常，AI 爬虫无法获取内容 |
+| **邮件正文** | 包含：异常时间、具体哪个门控项从几分掉到 0 分、影响分析、总分变化、建议操作、跳转详情链接 |
+
+---
+
+**告警类型 2：评分骤降（score_drop）— P1 高**
+
+| 项目 | 说明 |
+|------|------|
+| **触发条件** | 品牌官网最新一次扫描总分，比上一次扫描下降 ≥10 分（且不是门控导致的封顶） |
+| **检测方法** | 每次 site_audit 扫描完成后，对比本次 normalized_score 与上一次的差值。如果差值 ≤ -10 且本次 gate_capped=false，则触发。同时找出失分最多的 3 个检查项，写入告警详情 |
+| **为什么重要** | 评分骤降一定是某个地方出了问题——页面删了、sitemap 失效了、结构化数据丢了。早发现早修复 |
+| **业务举例** | CMS 改版导致文章 URL 变更产生 404、批量删除了文章导致 lastmod 覆盖率下降、技术改了页面结构导致 JSON-LD 丢失 |
+| **严重级别** | **P1** |
+| **通知渠道** | 邮件即时发送 + 系统内通知 |
+| **静默时长** | 24 小时 |
+| **邮件标题** | 【P1】{品牌名}GEO 就绪度评分下降 {差值}分 |
+| **邮件正文** | 包含：上次分数→本次分数、失分最多的 3 个检查项及原因、怀疑原因、建议操作、跳转链接 |
+
+---
+
+**告警类型 3：提及率异常（mention_anomaly）— P1 高**
+
+| 项目 | 说明 |
+|------|------|
+| **触发条件** | 某个监测问题/医生，在某个平台的最新一轮提及率，比上一轮下降超过 40 个百分点（例如从 80% 掉到 40% 以下），或 Top1 推荐率下降超过 30 个百分点 |
+| **检测方法** | 每次全量采集完成后，按问题×平台分组，对比最新一轮与上一轮的 mentioned 比率和 rank=1 比率。计算差值，超过阈值则触发。需要至少有前一轮数据才判断（首次采集不触发） |
+| **为什么重要** | 这是最直接的业务事故信号。可能是 AI 平台算法变了、竞品内容冲击了、或你的内容被降权了 |
+| **业务举例** | 张医生在 GLM 的 Top1 推荐率从 90% 掉到 30%、某核心问题在 DeepSeek 的提及率从 70% 掉到 20% |
+| **严重级别** | **P1** |
+| **通知渠道** | 邮件即时发送 + 系统内通知 |
+| **静默时长** | 48 小时（同一问题×平台组合 48 小时内不重复） |
+| **邮件标题** | 【P1】{问题名}在{平台}提及率异常下降 |
+| **邮件正文** | 包含：问题名、平台、上次提及率→本次提及率、上次 Top1 率→本次 Top1 率、最近 3 轮数据对比、原始回答链接 |
+
+---
+
+**告警类型 4：采集失败率高（collection_failure）— P2 中**
+
+| 项目 | 说明 |
+|------|------|
+| **触发条件** | 当天采集任务中，失败/超时/被阻断的记录数占总记录数的比例 ≥ 30% |
+| **检测方法** | 每次采集任务结束后，统计 collect_status != 'success' 的记录数占比。超过阈值则触发。注意：要把"门控阻断"和"API 错误"分开统计，门控阻断不应计入失败率（因为那是预期行为） |
+| **为什么重要** | 如果采集都失败了，仪表盘上的数据是假的——不是"提及率 0%"，而是"根本没采到数据"。必须区分这两种情况 |
+| **业务举例** | DeepSeek API 改了返回格式导致解析失败、某平台限流导致大量超时、网络问题导致连接失败 |
+| **严重级别** | **P2** |
+| **通知渠道** | 系统内通知 + 次日早间汇总邮件（不单独即时发邮件） |
+| **静默时长** | 24 小时 |
+| **通知内容** | 包含：当天总采集数、成功数、失败数、失败率、各平台失败数分布、主要错误类型、跳转错误详情 |
+
+---
+
+**告警类型 5：竞品反超（competitor_overtake）— P2 中**
+
+| 项目 | 说明 |
+|------|------|
+| **触发条件** | 某个竞品的最新 GEO 扫描评分，超过本企业最新评分；或本企业与竞品的差距缩小了 ≥15 分 |
+| **检测方法** | 每次竞品官网扫描完成后，对比竞品最新 normalized_score 与本企业最新 normalized_score。如果竞品分 > 本企业分，且上次扫描时竞品分 ≤ 本企业分，则触发"反超"告警。如果差距缩小 ≥15 分（但尚未反超），触发"差距缩小"通知 |
+| **为什么重要** | GEO 是相对竞争，竞品在做什么优化你需要知道，才能跟上 |
+| **业务举例** | 竞品最近上了 llms.txt 和 JSON-LD，评分从 60 升到 74，超过了你 |
+| **严重级别** | **P2** |
+| **通知渠道** | 系统内通知 + 次日早间汇总邮件 |
+| **静默时长** | 7 天（竞品评分每周扫描一次，一周内不重复） |
+| **通知内容** | 包含：竞品名、上次评分→本次评分、本企业评分、差距、竞品进步最大的支柱、建议优先优化项 |
+
+---
+
+**告警类型 6：新内容质量低（content_quality_low）— P3 低**
+
+| 项目 | 说明 |
+|------|------|
+| **触发条件** | 新录入/新编辑的内容，GEO 质量分 < 15/45（满分 45） |
+| **检测方法** | 内容 Linter 每次检测完成后，如果分数 < 15，直接触发一条 P3 告警。这不是"变化检测"，而是"即时判断"——内容一入库就判断是否合格 |
+| **为什么重要** | 低质量内容不仅不被 AI 引用，还稀释网站整体质量信号。早发现早改写，不要让垃圾内容上线 |
+| **业务举例** | 运营录入了一篇标题是关键词串、正文只有 200 字、无作者无日期的文章 |
+| **严重级别** | **P3** |
+| **通知渠道** | 仅系统内通知（不发邮件），攒入次日运营日报 |
+| **静默时长** | 不静默（每篇低分内容都通知，但同一内容不重复告警除非修改后仍低分） |
+| **通知内容** | 包含：文章标题、质量分、失分最多的 3 项及改进建议、跳转编辑链接 |
+
+---
+
+#### 2.7.3 数据模型设计
+
+**表 1：alert_rule（告警规则表）**
 
 ```sql
 CREATE TABLE alert_rule (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    type TEXT NOT NULL,           -- gate_change / score_drop / competitor_overtake / ...
-    severity TEXT NOT NULL,        -- P0/P1/P2/P3
-    threshold JSON NOT NULL,       -- 阈值配置，如 {"drop_points": 10}
-    channels TEXT NOT NULL DEFAULT '["email"]',  -- 通知渠道
-    is_enabled BOOLEAN DEFAULT 1,
-    silent_until DATETIME,         -- 静默期（避免重复告警）
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT NOT NULL,
+    rule_type       TEXT NOT NULL UNIQUE,
+    severity        TEXT NOT NULL,                   -- P0/P1/P2/P3
+    threshold       TEXT NOT NULL DEFAULT '{}',     -- 阈值JSON
+    channels        TEXT NOT NULL DEFAULT '["system"]',
+    is_enabled      BOOLEAN NOT NULL DEFAULT 1,
+    silent_hours    INTEGER NOT NULL DEFAULT 24,
+    notify_email    TEXT,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 系统初始化插入6条默认规则：
+-- 1. gate_change (P0, system+email, 24h)
+-- 2. score_drop (P1, system+email, 24h, drop_points=10)
+-- 3. mention_anomaly (P1, system+email, 48h, drop_pct=40)
+-- 4. collection_failure (P2, system, 24h, fail_rate=30%)
+-- 5. competitor_overtake (P2, system, 7d)
+-- 6. content_quality_low (P3, system, min_score=15)
+```
+
+**表 2：alert_event（告警事件表）**
+
+```sql
 CREATE TABLE alert_event (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    rule_id INTEGER NOT NULL,
-    title TEXT NOT NULL,
-    message TEXT NOT NULL,
-    severity TEXT NOT NULL,
-    related_url TEXT,               -- 相关网站URL
-    related_audit_id INTEGER,       -- 相关扫描记录
-    metric_before REAL,             -- 变化前指标
-    metric_after REAL,              -- 变化后指标
-    status TEXT DEFAULT 'open',     -- open/acknowledged/resolved
-    notified_channels TEXT DEFAULT '[]',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_id             INTEGER NOT NULL,
+    rule_type           TEXT NOT NULL,
+    severity            TEXT NOT NULL,
+    title               TEXT NOT NULL,
+    message             TEXT NOT NULL,
+    message_html        TEXT,
+    related_object_type TEXT,    -- website/question/doctor/content/competitor/collection
+    related_object_id   INTEGER,
+    related_object_name TEXT,
+    related_url         TEXT,
+    metric_before       REAL,
+    metric_after        REAL,
+    metric_diff         REAL,
+    status              TEXT NOT NULL DEFAULT 'open',  -- open/acknowledged/resolved
+    notified_channels   TEXT NOT NULL DEFAULT '[]',
+    acknowledged_at     DATETIME,
+    acknowledged_by     TEXT,
+    resolved_at         DATETIME,
+    resolve_note        TEXT,
+    created_at          DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (rule_id) REFERENCES alert_rule(id)
+);
+CREATE INDEX idx_alert_event_status ON alert_event(status);
+CREATE INDEX idx_alert_event_type ON alert_event(rule_type);
+CREATE INDEX idx_alert_event_created ON alert_event(created_at);
+```
+
+**表 3：alert_daily_digest（每日运营日报表）**
+
+```sql
+CREATE TABLE alert_daily_digest (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    digest_date     DATE NOT NULL UNIQUE,
+    summary         TEXT NOT NULL DEFAULT '{}',
+    sent_at         DATETIME,
+    sent_to         TEXT,
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
-#### 2.7.3 实施步骤
+#### 2.7.4 后端模块设计
 
-1. **后端引擎**：`app/engines/alert_engine.py`
-   - `check_gate_change()`：对比最新扫描与上一次扫描的门控状态
-   - `check_score_drop()`：对比评分变化
-   - `check_competitor_overtake()`：对比竞品评分
-   - `check_mention_anomaly()`：对比提及率变化
-   - `send_notification()`：按渠道发送（邮件 SMTP / 飞书 webhook / 钉钉 webhook）
-2. **定时任务**：在 APScheduler 中增加每日告警检查任务（每天扫描后运行）
-3. **后端 API**：`/api/alerts/rules`（CRUD）、`/api/alerts/events`（列表/确认/解决）
-4. **前端页面**：`pages/Alerts.tsx`（告警列表+规则配置）
-5. **通知模板**：每个告警类型有标准化的标题和消息模板，包含关键数据和跳转链接
+**目录结构**：
 
-#### 2.7.4 验收标准
+```
+backend/app/
+├── engines/alert_engine.py           # 告警检测引擎（核心）
+├── services/
+│   ├── alert_service.py              # CRUD + 状态流转
+│   ├── email_service.py             # SMTP邮件发送 + HTML模板
+│   └── digest_service.py            # 每日日报汇总
+├── api/alerts.py                    # API路由
+├── models/alert.py                  # SQLAlchemy模型
+└── schemas/alert.py                 # Pydantic模型
+```
+
+**alert_engine.py 核心逻辑**：
+
+```python
+class AlertEngine:
+    """在数据变化事件发生时被调用，检测是否产生新告警"""
+
+    def on_site_audit_completed(self, audit_id):
+        """扫描完成：门控变化 + 评分骤降 + 竞品反超"""
+        self._check_gate_change(audit_id)
+        self._check_score_drop(audit_id)
+        self._check_competitor_overtake(audit_id)
+
+    def on_collection_completed(self, collection_date):
+        """采集完成：提及率异常 + 采集失败率"""
+        self._check_mention_anomaly(collection_date)
+        self._check_collection_failure(collection_date)
+
+    def on_content_audited(self, content_id, geo_score):
+        """内容检测完成：内容质量"""
+        self._check_content_quality(content_id, geo_score)
+
+    def _create_alert(self, rule_type, severity, title, message, **kwargs):
+        """通用创建：查规则→静默期去重→写事件→按渠道发送
+        P0/P1 → 邮件即时发送 + 系统内
+        P2/P3 → 仅系统内（次日日报汇总）"""
+        ...
+```
+
+**email_service.py 核心逻辑**：
+
+```python
+def send_alert_email(event, rule):
+    """SMTP发送HTML告警邮件——仅P0/P1调用"""
+    to_email = rule.notify_email or settings.ALERT_EMAIL_TO
+    # 构建 MIMEMultipart（纯文本+HTML双版本，内联CSS，邮件客户端兼容）
+    # SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT) 登录发送
+    ...
+```
+
+**config.py 新增配置项**：
+
+```python
+SMTP_HOST: str = ""              # 如 smtp.exmail.qq.com
+SMTP_PORT: int = 465
+SMTP_USER: str = ""
+SMTP_PASSWORD: str = ""
+SMTP_FROM: str = ""
+ALERT_EMAIL_TO: str = ""         # 告警收件邮箱（个人邮箱，后期可改公共邮箱）
+FRONTEND_BASE_URL: str = "http://localhost:3000"
+```
+
+**.env.example 新增**：
+
+```bash
+SMTP_HOST=smtp.exmail.qq.com
+SMTP_PORT=465
+SMTP_USER=geo-alert@yourcompany.com
+SMTP_PASSWORD=your-smtp-auth-code
+SMTP_FROM=geo-alert@yourcompany.com
+ALERT_EMAIL_TO=you@yourcompany.com
+FRONTEND_BASE_URL=http://your-domain.com
+```
+
+#### 2.7.5 后端 API 设计
+
+| 方法 | 路径 | 功能 |
+|------|------|------|
+| GET | `/api/alerts/events` | 告警列表（状态/级别/类型筛选，分页） |
+| GET | `/api/alerts/events/{id}` | 单个告警详情 |
+| POST | `/api/alerts/events/{id}/ack` | 确认告警（open→acknowledged） |
+| POST | `/api/alerts/events/{id}/resolve` | 解决告警（acknowledged→resolved） |
+| GET | `/api/alerts/unread-count` | 未读告警数（铃铛轮询用） |
+| GET | `/api/alerts/rules` | 所有告警规则 |
+| PUT | `/api/alerts/rules/{id}` | 更新规则（阈值/渠道/启用） |
+| GET | `/api/alerts/config` | 获取邮件配置（脱敏，不返回密码） |
+| PUT | `/api/alerts/config` | 更新 SMTP 配置 |
+| POST | `/api/alerts/test-email` | 发送测试邮件验证配置 |
+
+#### 2.7.6 前端设计
+
+**全局铃铛组件（Layout.tsx 右上角）**：
+- Ant Design BellOutlined + 红色 Badge 未读数
+- 点击下拉显示最近 5 条未读告警（标题+时间+严重级别颜色标签）
+- 每 60 秒轮询 `/api/alerts/unread-count`
+- 底部"查看全部"跳转告警列表页
+
+**告警列表页（pages/Alerts.tsx）**：
+- Tab 筛选：全部 / 待处理 / 已确认 / 已解决
+- 严重级别颜色标签（P0红/P1橙/P2黄/P3绿）
+- 每条告警卡片：标题、关联对象名、时间、前后数据对比、操作按钮（确认/详情/跳转）
+- 详情 Drawer：完整消息、HTML正文、关联对象信息、操作时间线
+
+**规则配置（Settings 页面内 Tab）**：
+- 邮件配置区：SMTP服务器/端口/账号/授权码/收件人 + "发送测试邮件"按钮
+- 规则列表区：6条规则的启用开关、阈值、通知渠道勾选框
+
+#### 2.7.7 触发时机（事件驱动，非轮询）
+
+| 触发时机 | 检测方法 | 调用位置 |
+|---------|---------|---------|
+| 每次站点扫描完成后 | gate_change + score_drop + competitor_overtake | 扫描任务末尾 |
+| 每次全量采集完成后 | mention_anomaly + collection_failure | 采集任务末尾 |
+| 每次内容GEO检测后 | content_quality_low | 内容Linter末尾 |
+| 每天早上8:00（APScheduler） | 生成日报 + 发送P2/P3汇总邮件 | 定时任务 |
+
+**为什么不用每分钟轮询数据库？** 告警检测是事件驱动的——数据变化时才需要检查。P0/P1 的时效性由事件驱动保证（扫描/采集完成立即触发），不需要持续轮询。
+
+#### 2.7.8 实施步骤（6 天）
+
+| 天 | 任务 | 产出 |
+|----|------|------|
+| 第1天 | 建3张表 + SQLAlchemy模型 + Pydantic schema + config配置项 + email_service.py | 数据库就绪，邮件可发测试 |
+| 第2天 | alert_engine.py：实现 gate_change + score_drop + 通用_create_alert（含静默期去重） | P0/P1告警能触发并发邮件 |
+| 第3天 | alert_engine.py：实现其余4类检测方法，接入各事件回调 | 6类告警全部触发 |
+| 第4天 | alerts.py API：事件列表/确认/解决/未读数/规则/配置 | 后端API全部可用 |
+| 第5天 | 前端：Layout铃铛组件 + Alerts.tsx告警列表页 | 系统内可查看管理告警 |
+| 第6天 | 前端：Settings邮件配置+规则Tab + 测试邮件 + 日报服务 + 全链路联调 | 完整闭环可用 |
+
+#### 2.7.9 验收标准
 
 | 验收项 | 标准 |
 |--------|------|
-| 告警触发 | 构造测试数据（如手动修改评分），对应告警正确触发 |
-| 通知发送 | 飞书 webhook 可收到告警消息，格式正确含链接 |
-| 去重静默 | 同一告警在静默期内不重复发送 |
-| 规则配置 | 可在前端创建/编辑/启用/禁用告警规则 |
-| 告警管理 | 可确认/解决告警，状态正确更新 |
+| 6类告警全部触发 | 构造测试数据，6类都能正确创建AlertEvent |
+| P0/P1发邮件 | 触发后1分钟内收到邮件，含关键数据和跳转链接 |
+| P2/P3不发即时邮件 | 只在系统内通知，不发即时邮件 |
+| 去重静默 | 同一规则+对象在静默期内不重复告警 |
+| 状态流转 | open → acknowledged → resolved 正确更新 |
+| 铃铛红点 | 有未处理告警时铃铛显示红色数字 |
+| 邮件配置 | Settings可配置SMTP，"发送测试邮件"可收到 |
+| 规则可配置 | 每条规则可独立开关、调阈值 |
+| 日报汇总 | 每天早上自动发送前一天P2/P3汇总邮件 |
+| 错误降级 | SMTP配置错误时，告警仍写入系统内，不影响告警创建 |
 
 ---
 
