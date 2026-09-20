@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import { Card, Input, Button, Space, Typography, Tag, Empty, Spin, Modal, Form, message, Popconfirm } from 'antd'
 import { PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, EyeOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -13,6 +13,7 @@ const PublishedList = () => {
   const [loading, setLoading] = useState(false)
   const [items, setItems] = useState<any[]>([])
   const [keyword, setKeyword] = useState('')
+  const [stats, setStats] = useState<any>({})
 
   // 编辑模态框
   const [editModalOpen, setEditModalOpen] = useState(false)
