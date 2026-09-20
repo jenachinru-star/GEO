@@ -4,6 +4,7 @@ import { Card, Button, Space, Typography, Tag, Spin, message, Tabs, Divider, Sel
 import { ArrowLeftOutlined, RobotOutlined, SendOutlined, UserOutlined, ThunderboltOutlined, PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, DiffOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { assetApi } from '@/api/asset'
+import MindmapViewer from '@/components/MindmapViewer'
 import { marked } from 'marked'
 
 const { Title, Paragraph, Text } = Typography
