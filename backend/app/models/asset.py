@@ -39,6 +39,11 @@ class AssetSource(Base):
     tags = Column(String(500), default="")
     category = Column(String(50), default="", index=True)  # medicine / business / personal / other
 
+    # 文件夹和阅读状态
+    folder_id = Column(Integer, ForeignKey("geo_asset_folder.id"), nullable=True, index=True)
+    is_starred = Column(Integer, default=0, index=True)  # 0=未星标, 1=已星标
+    read_status = Column(String(20), default="unread", index=True)  # unread / reading / read
+
     # 浏览器插件收藏时的额外元数据
     metadata_json = Column(JSON, default=dict)  # {favicon, description, author, ...}
 
