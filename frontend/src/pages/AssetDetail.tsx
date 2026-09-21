@@ -161,7 +161,7 @@ const AssetDetail = () => {
       const link = document.createElement('a')
       link.href = url
       const extMap: Record<string, string> = { md: 'md', html: 'html', pdf: 'pdf', mindmap: 'mm.md', excel: 'xlsx', ppt: 'pptx' }
-      link.setAttribute('download', ${detail.document.title.slice(0, 50)}.)
+      link.setAttribute('download', `${detail.document.title.slice(0, 50)}.md`)
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -446,7 +446,7 @@ const AssetDetail = () => {
               style={{ width: 130 }}
               options={chatTemplates.map((t: any) => ({
                 value: t.key,
-                label: ${t.icon} ,
+                label: `${t.icon}`,
               }))}
             />
             <Button
@@ -779,3 +779,4 @@ const AssetDetail = () => {
 }
 
 export default AssetDetail
+

@@ -174,17 +174,18 @@ export const assetApi = {
     request.post('/asset/folders', data),
 
   updateFolder: (id: number, data: { name?: string }) =>
-    request.put(/asset/folders/, data),
+    request.put(`/asset/folders/${id}`, data),
 
   deleteFolder: (id: number) =>
-    request.delete(/asset/folders/),
+    request.delete(`/asset/folders/${id}`),
 
   moveToFolder: (data: { source_ids: number[]; folder_id?: number | null }) =>
     request.post('/asset/folders/move', data),
 
   toggleStar: (sourceId: number) =>
-    request.post(/asset/folders//star),
+    request.post(`/asset/sources/${sourceId}/star`),
 
   updateReadStatus: (sourceId: number, status: 'unread' | 'reading' | 'read') =>
-    request.post(/asset/folders//read-status?status=),
+    request.post(`/asset/sources/${sourceId}/read-status?status=${status}`),
 }
+

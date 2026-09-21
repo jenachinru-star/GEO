@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { Card, Input, Button, Space, Typography, Tag, Empty, Spin, Pagination, Modal, Form, Upload, message, Tabs, Divider } from 'antd'
 import { PlusOutlined, SearchOutlined, LinkOutlined, FileTextOutlined, BookOutlined, UploadOutlined, LoadingOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -15,6 +15,10 @@ const AssetHub = () => {
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [keyword, setKeyword] = useState('')
+
+  // 用ref保存最新的items，避免useEffect无限循环
+  const itemsRef = useRef<any[]>([])
+  itemsRef.current = items
 
   // 模态框状态
   const [modalOpen, setModalOpen] = useState(false)
@@ -54,13 +58,13 @@ const AssetHub = () => {
     fetchData()
     // 每10秒轮询一次，更新处理中的任务状态
     const timer = setInterval(() => {
-      const hasProcessing = items.some(i => i.status === 'pending' || i.status === 'processing')
+      const hasProcessing = itemsRef.current.some(i => i.status === 'pending' || i.status === 'processing')
       if (hasProcessing) {
         fetchData(page, keyword)
       }
     }, 10000)
     return () => clearInterval(timer)
-  }, [page, keyword, items])
+  }, [page, keyword])
 
   const handleSearch = () => {
     fetchData(1, keyword)
