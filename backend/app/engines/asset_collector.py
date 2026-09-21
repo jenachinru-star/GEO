@@ -70,6 +70,19 @@ class AssetCollector:
             # 来源网站
             source_site = parsed.netloc
 
+            # 检查内容是否太短（JS渲染的网站通常拿不到正文）
+            if len(content) < 100:
+                logger.warning(f"采集内容过短，可能是JS渲染页面: {len(content)}字符")
+                return {
+                    "success": False,
+                    "error": "该网站需要JavaScript渲染，暂不支持自动采集，请手动粘贴内容",
+                    "title": title or "未命名",
+                    "content": "",
+                    "author": "",
+                    "publish_date": "",
+                    "source_site": source_site,
+                }
+
             logger.info(f"采集成功: title={title[:50]}, content_len={len(content)}")
 
             return {

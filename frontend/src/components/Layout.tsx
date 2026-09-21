@@ -27,12 +27,48 @@ const { Header, Sider, Content } = Layout
 
 const menuItems = [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
-  { key: '/semantic', icon: <FileTextOutlined />, label: '语义库' },
-  { key: '/content', icon: <AppstoreOutlined />, label: '内容中心' },
-  { key: '/distribution', icon: <SendOutlined />, label: '发布管理' },
-  { key: '/data', icon: <MonitorOutlined />, label: '数据中心' },
-  { key: '/tasks', icon: <SyncOutlined />, label: '任务中心' },
-  { key: '/asset', icon: <BookOutlined />, label: '数字资产' },
+  {
+    key: 'monitor-group',
+    icon: <MonitorOutlined />,
+    label: 'AI监测',
+    children: [
+      { key: '/monitor', label: 'AI监测' },
+      { key: '/competitor', label: '竞品监测' },
+      { key: '/semantic', label: '语义库' },
+    ]
+  },
+  {
+    key: 'content-group',
+    icon: <AppstoreOutlined />,
+    label: '内容运营',
+    children: [
+      { key: '/content', label: '内容中心' },
+      { key: '/knowledge', label: '企业知识库' },
+      { key: '/distribution', label: '发布管理' },
+      { key: '/publish-accounts', label: '发布账号' },
+      { key: '/published', label: '已发布列表' },
+    ]
+  },
+  {
+    key: 'asset-group',
+    icon: <BookOutlined />,
+    label: '数字资产',
+    children: [
+      { key: '/asset', label: '资产库' },
+      { key: '/rag', label: '智能问答' },
+    ]
+  },
+  {
+    key: 'system-group',
+    icon: <SettingOutlined />,
+    label: '系统管理',
+    children: [
+      { key: '/data', label: '数据中心' },
+      { key: '/usage', label: '用量统计' },
+      { key: '/tasks', label: '任务中心' },
+      { key: '/settings', label: '系统设置' },
+    ]
+  },
 ]
 
 const MainLayout = () => {
