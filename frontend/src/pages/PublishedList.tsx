@@ -33,8 +33,18 @@ const PublishedList = () => {
     }
   }
 
+  const fetchStats = async () => {
+    try {
+      const res: any = await assetApi.getPublishStats()
+      setStats(res.data)
+    } catch (e) {
+      // 静默失败
+    }
+  }
+
   useEffect(() => {
     fetchData()
+    fetchStats()
   }, [])
 
   const handleEdit = async (item: any) => {
@@ -96,6 +106,30 @@ const PublishedList = () => {
 
   return (
     <div style={{ padding: '24px', maxWidth: 1000, margin: '0 auto' }}>
+      {/* 统计卡片 */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16, marginBottom: 24 }}>
+        <Card size="small">
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>总发布</div>
+          <div style={{ fontSize: 24, fontWeight: 600 }}>{stats.total || 0}</div>
+        </Card>
+        <Card size="small">
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>已发布</div>
+          <div style={{ fontSize: 24, fontWeight: 600, color: '#52c41a' }}>{stats.published || 0}</div>
+        </Card>
+        <Card size="small">
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>草稿</div>
+          <div style={{ fontSize: 24, fontWeight: 600, color: '#faad14' }}>{stats.draft || 0}</div>
+        </Card>
+        <Card size="small">
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>总浏览量</div>
+          <div style={{ fontSize: 24, fontWeight: 600, color: '#1677ff' }}>{stats.total_views || 0}</div>
+        </Card>
+        <Card size="small">
+          <div style={{ fontSize: 12, color: '#999', marginBottom: 4 }}>总引用数</div>
+          <div style={{ fontSize: 24, fontWeight: 600, color: '#722ed1' }}>{stats.total_citations || 0}</div>
+        </Card>
+      </div>
+
       {/* 顶部 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <Title level={3} style={{ margin: 0 }}>科普发布中心</Title>

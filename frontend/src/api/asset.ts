@@ -11,6 +11,8 @@ export const assetApi = {
     keyword?: string
     page?: number
     page_size?: number
+    folder_id?: string | number
+    tag_id?: number
   }) => request.get('/asset/sources', { params }),
 
   createSource: (data: {
@@ -162,7 +164,7 @@ export const assetApi = {
   // ===== 内容导出 =====
   exportDocument: (data: {
     document_id: number
-    format: 'md' | 'html' | 'pdf'
+    format: 'md' | 'html' | 'pdf' | 'mindmap' | 'excel' | 'ppt'
   }) => request.post('/asset/export/document', data, {
     responseType: 'blob',
   }),
@@ -187,5 +189,26 @@ export const assetApi = {
 
   updateReadStatus: (sourceId: number, status: 'unread' | 'reading' | 'read') =>
     request.post(`/asset/sources/${sourceId}/read-status?status=${status}`),
+
+  // ===== 标签管理 =====
+  getTags: () => request.get('/asset/tags'),
+
+  createTag: (data: { name: string; color?: string }) =>
+    request.post('/asset/tags', data),
+
+  updateTag: (id: number, data: { name?: string; color?: string }) =>
+    request.put(`/asset/tags/${id}`, data),
+
+  deleteTag: (id: number) =>
+    request.delete(`/asset/tags/${id}`),
+
+  setSourceTags: (data: { source_id: number; tag_ids: number[] }) =>
+    request.post('/asset/tags/set', data),
+
+  getSourceTags: (sourceId: number) =>
+    request.get(`/asset/tags/${sourceId}/get`),
+
+  // ===== 发布统计 =====
+  getPublishStats: () => request.get('/asset/publish/stats/overview'),
 }
 

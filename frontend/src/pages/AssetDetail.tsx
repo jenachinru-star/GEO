@@ -161,7 +161,8 @@ const AssetDetail = () => {
       const link = document.createElement('a')
       link.href = url
       const extMap: Record<string, string> = { md: 'md', html: 'html', pdf: 'pdf', mindmap: 'mm.md', excel: 'xlsx', ppt: 'pptx' }
-      link.setAttribute('download', `${detail.document.title.slice(0, 50)}.md`)
+      const ext = extMap[format] || 'md'
+      link.setAttribute('download', `${detail.document.title.slice(0, 50)}.${ext}`)
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -753,20 +754,7 @@ const AssetDetail = () => {
                 <p><Text type="secondary">标题：</Text>{detail.title}</p>
                 <p><Text type="secondary">来源URL：</Text>{detail.url || '-'}</p>
                 <p><Text type="secondary">分类：</Text>{detail.category || '-'}</p>
-                <div style={{ marginBottom: 12 }}>
-                  <Text type="secondary">标签：</Text>
-                  <Select
-                    mode="multiple"
-                    style={{ width: '100%', marginTop: 8 }}
-                    placeholder="选择标签"
-                    value={currentTagIds}
-                    onChange={handleTagChange}
-                    options={allTags.map((t: any) => ({
-                      value: t.id,
-                      label: t.name,
-                    }))}
-                  />
-                </div>
+                <p><Text type="secondary">标签：</Text>{detail.tags || '-'}</p>
                 <p><Text type="secondary">创建时间：</Text>{detail.created_at ? formatUtcTime(detail.created_at) : '-'}</p>
                 <p><Text type="secondary">更新时间：</Text>{detail.updated_at ? formatUtcTime(detail.updated_at) : '-'}</p>
               </Card>
