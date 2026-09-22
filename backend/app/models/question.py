@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -8,6 +8,7 @@ class Question(Base):
     __tablename__ = "geo_question"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("geo_user.id"), nullable=False, index=True, default=1)
     question = Column(String(500), nullable=False, index=True)
     category = Column(String(50), default="general")  # brand/tech/competitor/industry/general
     tags = Column(String(500), default="")  # 逗号分隔

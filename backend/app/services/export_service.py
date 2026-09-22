@@ -67,7 +67,8 @@ class ExportService:
     @classmethod
     def export_monitor_records(cls, db: Session, question_id: Optional[int] = None,
                                 start_date: Optional[str] = None,
-                                end_date: Optional[str] = None) -> bytes:
+                                end_date: Optional[str] = None,
+                                user_id: Optional[int] = None) -> bytes:
         """导出监测记录为Excel"""
         wb = Workbook()
         ws = wb.active
@@ -82,6 +83,8 @@ class ExportService:
 
         # 查询数据
         query = db.query(MonitorRecord, Question).join(Question, MonitorRecord.question_id == Question.id)
+        if user_id is not None:
+            query = query.filter(Question.user_id == user_id)
         if question_id:
             query = query.filter(MonitorRecord.question_id == question_id)
         if start_date:
@@ -121,7 +124,7 @@ class ExportService:
         return output.getvalue()
 
     @classmethod
-    def export_questions(cls, db: Session) -> bytes:
+    def export_questions(cls, db: Session, user_id: Optional[int] = None) -> bytes:
         """导出问题列表为Excel"""
         wb = Workbook()
         ws = wb.active
@@ -132,7 +135,10 @@ class ExportService:
             ws.cell(row=1, column=col, value=header)
         cls._style_header(ws, 1, len(headers))
 
-        questions = db.query(Question).order_by(Question.priority.desc(), Question.id).all()
+        questions = db.query(Question)
+        if user_id is not None:
+            questions = questions.filter(Question.user_id == user_id)
+        questions = questions.order_by(Question.priority.desc(), Question.id).all()
         for row_idx, q in enumerate(questions, 2):
             ws.cell(row=row_idx, column=1, value=q.id)
             ws.cell(row=row_idx, column=2, value=q.question)
@@ -156,7 +162,7 @@ class ExportService:
         return output.getvalue()
 
     @classmethod
-    def export_knowledge(cls, db: Session) -> bytes:
+    def export_knowledge(cls, db: Session, user_id: Optional[int] = None) -> bytes:
         """导出知识库为Excel"""
         wb = Workbook()
         ws = wb.active
@@ -168,7 +174,10 @@ class ExportService:
         cls._style_header(ws, 1, len(headers))
 
         level_names = {"public": "公开", "internal": "内部", "confidential": "涉密"}
-        knowledge_list = db.query(Knowledge).order_by(Knowledge.category, Knowledge.id).all()
+        knowledge_list = db.query(Knowledge)
+        if user_id is not None:
+            knowledge_list = knowledge_list.filter(Knowledge.user_id == user_id)
+        knowledge_list = knowledge_list.order_by(Knowledge.category, Knowledge.id).all()
         for row_idx, k in enumerate(knowledge_list, 2):
             ws.cell(row=row_idx, column=1, value=k.id)
             ws.cell(row=row_idx, column=2, value=k.title)
@@ -194,7 +203,7 @@ class ExportService:
         return output.getvalue()
 
     @classmethod
-    def export_content(cls, db: Session) -> bytes:
+    def export_content(cls, db: Session, user_id: Optional[int] = None) -> bytes:
         """导出内容资产为Excel"""
         wb = Workbook()
         ws = wb.active
@@ -206,7 +215,10 @@ class ExportService:
             ws.cell(row=1, column=col, value=header)
         cls._style_header(ws, 1, len(headers))
 
-        contents = db.query(Content).order_by(Content.created_at.desc()).all()
+        contents = db.query(Content)
+        if user_id is not None:
+            contents = contents.filter(Content.user_id == user_id)
+        contents = contents.order_by(Content.created_at.desc()).all()
         for row_idx, c in enumerate(contents, 2):
             ws.cell(row=row_idx, column=1, value=c.id)
             ws.cell(row=row_idx, column=2, value=c.title)
@@ -234,7 +246,7 @@ class ExportService:
         return output.getvalue()
 
     @classmethod
-    def export_full_report(cls, db: Session) -> bytes:
+    def export_full_report(cls, db: Session, user_id: Optional[int] = None) -> bytes:
         """导出完整报告（多Sheet）"""
         wb = Workbook()
 
@@ -246,9 +258,18 @@ class ExportService:
         ws_summary.cell(row=2, column=1, value=f"生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         ws_summary.cell(row=3, column=1, value=f"品牌: {settings.DEFAULT_BRAND_NAME}")
 
-        total_questions = db.query(Question).filter(Question.status == True).count()
-        total_records = db.query(MonitorRecord).count()
-        mentioned_records = db.query(MonitorRecord).filter(MonitorRecord.mentioned == True).count()
+        total_questions = db.query(Question).filter(Question.status == True)
+        if user_id is not None:
+            total_questions = total_questions.filter(Question.user_id == user_id)
+        total_questions = total_questions.count()
+        total_records = db.query(MonitorRecord, Question).join(Question, MonitorRecord.question_id == Question.id)
+        if user_id is not None:
+            total_records = total_records.filter(Question.user_id == user_id)
+        total_records = total_records.count()
+        mentioned_records = db.query(MonitorRecord, Question).join(Question, MonitorRecord.question_id == Question.id).filter(MonitorRecord.mentioned == True)
+        if user_id is not None:
+            mentioned_records = mentioned_records.filter(Question.user_id == user_id)
+        mentioned_records = mentioned_records.count()
         mention_rate = (mentioned_records / total_records * 100) if total_records > 0 else 0
 
         ws_summary.cell(row=5, column=1, value="核心指标")
@@ -277,7 +298,10 @@ class ExportService:
 
         records = db.query(MonitorRecord, Question).join(
             Question, MonitorRecord.question_id == Question.id
-        ).order_by(MonitorRecord.detect_date.desc(), MonitorRecord.id.desc()).limit(1000).all()
+        )
+        if user_id is not None:
+            records = records.filter(Question.user_id == user_id)
+        records = records.order_by(MonitorRecord.detect_date.desc(), MonitorRecord.id.desc()).limit(1000).all()
 
         for row_idx, (record, question) in enumerate(records, 2):
             ws_records.cell(row=row_idx, column=1, value=record.id)
@@ -305,7 +329,10 @@ class ExportService:
             ws_questions.cell(row=1, column=col, value=header)
         cls._style_header(ws_questions, 1, len(q_headers))
 
-        questions = db.query(Question).order_by(Question.priority.desc()).all()
+        questions = db.query(Question)
+        if user_id is not None:
+            questions = questions.filter(Question.user_id == user_id)
+        questions = questions.order_by(Question.priority.desc()).all()
         for row_idx, q in enumerate(questions, 2):
             ws_questions.cell(row=row_idx, column=1, value=q.id)
             ws_questions.cell(row=row_idx, column=2, value=q.question)

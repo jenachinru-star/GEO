@@ -8,6 +8,7 @@ class Competitor(Base):
     __tablename__ = "geo_competitor"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("geo_user.id"), nullable=False, index=True, default=1)
     name = Column(String(200), nullable=False)
     aliases = Column(String(500), default="")  # 别名，逗号分隔
     industry = Column(String(100), default="")

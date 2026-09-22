@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from typing import List
 import os
 
@@ -76,8 +77,11 @@ class Settings(BaseSettings):
     IAM_CLIENT_ID: str = ""
     IAM_CLIENT_SECRET: str = ""
     IAM_REDIRECT_URI: str = ""
-    JWT_SECRET: str = "geo-monitor-jwt-secret"
+    JWT_SECRET: str = Field(default="dev-only-insecure-secret-change-me", env="JWT_SECRET")
     JWT_EXPIRE_HOURS: int = 24
+
+    # 发布账号凭证加密密钥
+    ENCRYPT_KEY: str = Field(default="", env="ENCRYPT_KEY")
 
     # CORS
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
@@ -122,3 +126,10 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# 启动检查：JWT_SECRET使用默认值时警告
+if settings.JWT_SECRET == "dev-only-insecure-secret-change-me":
+    import logging
+    logging.getLogger(__name__).warning(
+        "⚠️  JWT_SECRET 使用默认值！生产环境必须设置 JWT_SECRET 环境变量"
+    )

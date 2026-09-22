@@ -118,6 +118,16 @@ def claim_next_task(db: Session) -> AsyncTask | None:
         return None
 
     db.refresh(task)
+
+    # 排队超时检查：任务在队列中等待过久，直接标记failed不执行
+    if task.created_at and (datetime.now() - task.created_at).total_seconds() > TASK_TIMEOUT_SECONDS:
+        logger.warning(f"任务 #{task.id} 排队超时（created_at={task.created_at}），标记为failed")
+        task.status = "failed"
+        task.error_message = "任务排队超时"
+        task.finished_at = datetime.now()
+        db.commit()
+        return None
+
     logger.info(f"认领任务 #{task.id} (type={task.task_type})")
     return task
 
@@ -147,6 +157,11 @@ def execute_task(db: Session, task: AsyncTask, on_progress: ProgressCallback = N
 
 def complete_task(db: Session, task: AsyncTask, result: dict = None, error: str = None):
     """完成任务（成功或失败）"""
+    # 状态防御：已经是终态的任务不允许再改
+    if task.status in ("succeeded", "failed", "cancelled"):
+        logger.warning(f"任务 #{task.id} 已处于终态 {task.status}，忽略 complete_task 调用")
+        return
+
     if error:
         task.status = "failed"
         task.error_message = error[:2000] if error else ""

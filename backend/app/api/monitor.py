@@ -25,13 +25,13 @@ def get_questions(
     user_id: int = Depends(get_current_user_id)
 ):
     service = MonitorService(db)
-    result = service.get_question_list(category, status, keyword, page, page_size)
+    result = service.get_question_list(category, status, keyword, page, page_size, user_id=user_id)
     return {"code": 0, "message": "success", "data": result}
 
 
 @router.post("/questions", summary="新增监测问题")
 def create_question(data: QuestionCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    q = Question(**data.model_dump())
+    q = Question(**data.model_dump(), user_id=user_id)
     db.add(q)
     db.commit()
     db.refresh(q)
@@ -40,7 +40,7 @@ def create_question(data: QuestionCreate, db: Session = Depends(get_db), user_id
 
 @router.put("/questions/{question_id}", summary="更新监测问题")
 def update_question(question_id: int, data: QuestionUpdate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    q = db.query(Question).filter(Question.id == question_id).first()
+    q = db.query(Question).filter(Question.id == question_id, Question.user_id == user_id).first()
     if not q:
         return {"code": 404, "message": "问题不存在"}
     update_data = data.model_dump(exclude_unset=True)
@@ -53,7 +53,7 @@ def update_question(question_id: int, data: QuestionUpdate, db: Session = Depend
 
 @router.delete("/questions/{question_id}", summary="删除监测问题")
 def delete_question(question_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    q = db.query(Question).filter(Question.id == question_id).first()
+    q = db.query(Question).filter(Question.id == question_id, Question.user_id == user_id).first()
     if not q:
         return {"code": 404, "message": "问题不存在"}
     db.delete(q)
@@ -73,7 +73,7 @@ def get_records(
     user_id: int = Depends(get_current_user_id)
 ):
     service = MonitorService(db)
-    result = service.get_monitor_records(question_id, platform_code, start_date, end_date, page, page_size)
+    result = service.get_monitor_records(question_id, platform_code, start_date, end_date, page, page_size, user_id=user_id)
     return {"code": 0, "message": "success", "data": result}
 
 
@@ -84,7 +84,7 @@ def get_matrix(
     user_id: int = Depends(get_current_user_id)
 ):
     service = MonitorService(db)
-    result = service.get_question_matrix(date=date)
+    result = service.get_question_matrix(date=date, user_id=user_id)
     return {"code": 0, "message": "success", "data": result}
 
 
@@ -97,7 +97,7 @@ def get_trend(
     user_id: int = Depends(get_current_user_id)
 ):
     service = MonitorService(db)
-    result = service.get_question_trend(question_id, platform_code, days)
+    result = service.get_question_trend(question_id, platform_code, days, user_id=user_id)
     return {"code": 0, "message": "success", "data": result}
 
 

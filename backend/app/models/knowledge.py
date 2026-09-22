@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -8,6 +8,7 @@ class Knowledge(Base):
     __tablename__ = "geo_knowledge"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("geo_user.id"), nullable=False, index=True, default=1)
     title = Column(String(500), nullable=False)
     category = Column(String(50), default="company")  # company/business/tech/case/qualification/team
     level = Column(String(20), default="public")  # public/internal/confidential

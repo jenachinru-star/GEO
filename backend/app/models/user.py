@@ -10,6 +10,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String(100), unique=True, nullable=False, index=True)
     email = Column(String(100), unique=True, nullable=True, index=True)
+    iam_user_id = Column(String(100), nullable=True, unique=True, index=True)
     password_hash = Column(String(500), default="")
     role = Column(String(20), default="doctor")  # admin/doctor/viewer
     status = Column(Boolean, default=True)

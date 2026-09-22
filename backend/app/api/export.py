@@ -34,35 +34,35 @@ def export_monitor(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    data = ExportService.export_monitor_records(db, question_id, start_date, end_date)
+    data = ExportService.export_monitor_records(db, question_id, start_date, end_date, user_id=user_id)
     filename = f"监测记录_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return _excel_response(data, filename)
 
 
 @router.get("/questions", summary="导出监测问题列表")
 def export_questions(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    data = ExportService.export_questions(db)
+    data = ExportService.export_questions(db, user_id=user_id)
     filename = f"监测问题_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return _excel_response(data, filename)
 
 
 @router.get("/knowledge", summary="导出知识库")
 def export_knowledge(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    data = ExportService.export_knowledge(db)
+    data = ExportService.export_knowledge(db, user_id=user_id)
     filename = f"知识库_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return _excel_response(data, filename)
 
 
 @router.get("/content", summary="导出内容资产")
 def export_content(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    data = ExportService.export_content(db)
+    data = ExportService.export_content(db, user_id=user_id)
     filename = f"内容资产_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return _excel_response(data, filename)
 
 
 @router.get("/report", summary="导出完整报告（多Sheet）")
 def export_full_report(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    data = ExportService.export_full_report(db)
+    data = ExportService.export_full_report(db, user_id=user_id)
     filename = f"GEO完整报告_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
     return _excel_response(data, filename)
 

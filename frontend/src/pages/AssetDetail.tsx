@@ -6,6 +6,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { assetApi } from '@/api/asset'
 import MindmapViewer from '@/components/MindmapViewer'
 import { marked } from 'marked'
+import { sanitizeHtml } from '@/utils/sanitize'
 
 const { Title, Paragraph, Text } = Typography
 const { TextArea, Search } = Input
@@ -17,7 +18,7 @@ const MarkdownText = ({ content }: { content: string }) => {
     <div
       className="markdown-body"
       style={{ whiteSpace: 'normal' }}
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(html as string) }}
     />
   )
 }

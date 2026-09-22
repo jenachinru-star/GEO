@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Float, ForeignKey
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -8,6 +8,7 @@ class Content(Base):
     __tablename__ = "geo_content"
 
     id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("geo_user.id"), nullable=False, index=True, default=1)
     title = Column(String(500), nullable=False)
     category = Column(String(50), default="article")  # article/whitepaper/news/case/tech
     tags = Column(String(500), default="")

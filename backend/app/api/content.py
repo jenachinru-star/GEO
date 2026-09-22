@@ -20,7 +20,7 @@ def get_contents(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    query = db.query(Content)
+    query = db.query(Content).filter(Content.user_id == user_id)
     if category:
         query = query.filter(Content.category == category)
     if keyword:
@@ -33,7 +33,7 @@ def get_contents(
 
 @router.post("", summary="新增内容")
 def create_content(data: ContentCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    c = Content(**data.model_dump())
+    c = Content(**data.model_dump(), user_id=user_id)
     # 生成向量
     text = f"{c.title} {c.content} {c.summary}"
     vec = vector_engine.text_to_vector(text)
@@ -46,7 +46,7 @@ def create_content(data: ContentCreate, db: Session = Depends(get_db), user_id: 
 
 @router.get("/{content_id}", summary="获取内容详情")
 def get_content(content_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    c = db.query(Content).filter(Content.id == content_id).first()
+    c = db.query(Content).filter(Content.id == content_id, Content.user_id == user_id).first()
     if not c:
         return {"code": 404, "message": "内容不存在"}
     return {"code": 0, "message": "success", "data": ContentDetailOut.model_validate(c)}
@@ -54,7 +54,7 @@ def get_content(content_id: int, db: Session = Depends(get_db), user_id: int = D
 
 @router.delete("/{content_id}", summary="删除内容")
 def delete_content(content_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    c = db.query(Content).filter(Content.id == content_id).first()
+    c = db.query(Content).filter(Content.id == content_id, Content.user_id == user_id).first()
     if not c:
         return {"code": 404, "message": "内容不存在"}
     db.delete(c)

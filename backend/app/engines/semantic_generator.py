@@ -40,48 +40,57 @@ class SemanticGenerator:
 
 请生成患者会在AI搜索中提问的相关问题。"""
 
-        adapter = self._get_adapter()
-        if not adapter:
+        adapters = self._get_adapters()
+        if not adapters:
             logger.warning("无可用AI平台，使用模板兜底生成")
             return self._fallback_generate(profile)
 
-        result: QueryResult = adapter.query(user_prompt, system_prompt=self.SYSTEM_PROMPT)
-        if not result.success:
-            logger.warning(f"语义生成LLM调用失败: {result.error}")
-            return self._fallback_generate(profile)
+        for code, adapter in adapters:
+            try:
+                result: QueryResult = adapter.query(user_prompt, system_prompt=self.SYSTEM_PROMPT)
+                if result.success:
+                    # 解析回答，每行一个问题
+                    questions = []
+                    for line in result.answer.split('\n'):
+                        line = line.strip()
+                        line = re.sub(r'^[\d]+[\.、\)）]\s*', '', line)
+                        line = re.sub(r'^[-*•]\s*', '', line)
+                        if line and 5 < len(line) < 100:
+                            questions.append(line)
 
-        # 解析回答，每行一个问题
-        questions = []
-        for line in result.answer.split('\n'):
-            line = line.strip()
-            # 去掉编号前缀（1. / 1、 / (1) / 1)）
-            line = re.sub(r'^[\d]+[\.、\)）]\s*', '', line)
-            # 去掉markdown列表符号
-            line = re.sub(r'^[-*•]\s*', '', line)
-            if line and 5 < len(line) < 100:
-                questions.append(line)
+                    # 去重（保持顺序）
+                    questions = list(dict.fromkeys(questions))
 
-        # 去重（保持顺序）
-        questions = list(dict.fromkeys(questions))
+                    if questions:
+                        logger.info(f"语义生成使用平台: {code}")
+                        # 不足10个用模板补充
+                        if len(questions) < 10:
+                            questions.extend(self._fallback_generate(profile))
+                            questions = list(dict.fromkeys(questions))
+                        # 统一确保每个问题以问号结尾
+                        questions = [self._ensure_question_mark(q) for q in questions]
+                        questions = list(dict.fromkeys(questions))
+                        return questions[:15]
+            except Exception as e:
+                logger.warning(f"平台 {code} 语义生成失败: {e}")
+                continue
 
-        # 不足10个用模板补充
-        if len(questions) < 10:
-            questions.extend(self._fallback_generate(profile))
-            questions = list(dict.fromkeys(questions))
+        # 全部平台失败才走fallback
+        logger.warning("所有平台语义生成失败，使用模板兜底生成")
+        return self._fallback_generate(profile)
 
-        # 统一确保每个问题以问号结尾
-        questions = [self._ensure_question_mark(q) for q in questions]
-        questions = list(dict.fromkeys(questions))
-
-        return questions[:15]
-
-    def _get_adapter(self):
+    def _get_adapters(self):
+        """返回所有已启用平台的适配器列表（按优先级顺序）"""
         if self.platform_code:
-            return adapter_factory.get_adapter(self.platform_code)
+            adapter = adapter_factory.get_adapter(self.platform_code)
+            return [(self.platform_code, adapter)] if adapter else []
         platforms = adapter_factory.get_enabled_platforms()
-        if platforms:
-            return adapter_factory.get_adapter(platforms[0])
-        return None
+        adapters = []
+        for code in platforms:
+            adapter = adapter_factory.get_adapter(code)
+            if adapter:
+                adapters.append((code, adapter))
+        return adapters
 
     def _fallback_generate(self, profile: dict) -> List[str]:
         """LLM不可用时的模板化兜底生成"""
@@ -92,8 +101,10 @@ class SemanticGenerator:
         specialty = specialty_raw.split(',')[0].strip() if specialty_raw else ''
         name = profile.get('real_name', '')
 
-        if not city or not specialty:
+        if not city:
             return []
+        if not specialty:
+            specialty = profile.get('department', '') or '综合'
 
         templates = [
             f"{city}{specialty}看哪个医生好？",

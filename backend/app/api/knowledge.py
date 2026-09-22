@@ -21,7 +21,7 @@ def get_knowledge(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    query = db.query(Knowledge).filter(Knowledge.status == True)
+    query = db.query(Knowledge).filter(Knowledge.status == True, Knowledge.user_id == user_id)
     if category:
         query = query.filter(Knowledge.category == category)
     if level:
@@ -36,7 +36,7 @@ def get_knowledge(
 
 @router.post("", summary="新增知识库条目")
 def create_knowledge(data: KnowledgeCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    k = Knowledge(**data.model_dump())
+    k = Knowledge(**data.model_dump(), user_id=user_id)
     # 生成向量
     text = f"{k.title} {k.content}"
     vec = vector_engine.text_to_vector(text)
@@ -49,7 +49,7 @@ def create_knowledge(data: KnowledgeCreate, db: Session = Depends(get_db), user_
 
 @router.put("/{knowledge_id}", summary="更新知识库条目")
 def update_knowledge(knowledge_id: int, data: KnowledgeUpdate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    k = db.query(Knowledge).filter(Knowledge.id == knowledge_id).first()
+    k = db.query(Knowledge).filter(Knowledge.id == knowledge_id, Knowledge.user_id == user_id).first()
     if not k:
         return {"code": 404, "message": "知识库条目不存在"}
     update_data = data.model_dump(exclude_unset=True)
@@ -67,7 +67,7 @@ def update_knowledge(knowledge_id: int, data: KnowledgeUpdate, db: Session = Dep
 
 @router.delete("/{knowledge_id}", summary="删除知识库条目")
 def delete_knowledge(knowledge_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    k = db.query(Knowledge).filter(Knowledge.id == knowledge_id).first()
+    k = db.query(Knowledge).filter(Knowledge.id == knowledge_id, Knowledge.user_id == user_id).first()
     if not k:
         return {"code": 404, "message": "知识库条目不存在"}
     k.status = False

@@ -203,12 +203,6 @@ class ArticleGenerator:
         return "\n\n".join(parts)
 
 
-# 全局单例
-_article_generator: Optional[ArticleGenerator] = None
-
-
+# 移除全局单例，每次请求创建新实例（ArticleGenerator无状态，仅持有db引用）
 def get_article_generator(db: Session) -> ArticleGenerator:
-    global _article_generator
-    if _article_generator is None:
-        _article_generator = ArticleGenerator(db)
-    return _article_generator
+    return ArticleGenerator(db)

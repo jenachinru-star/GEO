@@ -185,8 +185,8 @@ def generate_summary(
             platform=req.platform,
             model=getattr(adapter, 'model', ''),
             prompt_template=req.prompt_template,
-            tokens_input=result.tokens_input or 0,
-            tokens_output=result.tokens_output or 0,
+            tokens_input=result.prompt_tokens or 0,
+            tokens_output=result.completion_tokens or 0,
         )
         db.add(generated)
 
@@ -205,8 +205,8 @@ def generate_summary(
                 "content": result.answer,
                 "platform": req.platform,
                 "model": generated.model,
-                "tokens_input": result.tokens_input,
-                "tokens_output": result.tokens_output,
+                "tokens_input": result.prompt_tokens,
+                "tokens_output": result.completion_tokens,
             }
         }
 

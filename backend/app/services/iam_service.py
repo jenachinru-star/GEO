@@ -90,15 +90,26 @@ class IAMService:
 
     def get_or_create_user(self, userinfo: Dict) -> User:
         """根据IAM用户信息获取或创建本地用户（自动建号策略）"""
-        # 唯一键用IAM的sub（用户唯一ID），加iam:前缀防冲突
-        provider_uid = f"iam:{userinfo.get('sub', '')}"
+        iam_user_id = userinfo.get('sub', '')
         username = userinfo.get('preferred_username') or userinfo.get('name') or userinfo.get('sub', 'unknown')
+        email = userinfo.get('email', '')
 
-        user = self.db.query(User).filter(User.username == username).first()
+        # 优先按iam_user_id匹配，其次按email匹配（email在IAM系统中也是唯一的）
+        user = self.db.query(User).filter(User.iam_user_id == iam_user_id).first()
+        if not user and email:
+            user = self.db.query(User).filter(User.email == email).first()
         if not user:
+            # 确保username唯一
+            unique_username = username
+            counter = 1
+            while self.db.query(User).filter(User.username == unique_username).first():
+                unique_username = f"{username}_{counter}"
+                counter += 1
             # 自动建号
             user = User(
-                username=username,
+                username=unique_username,
+                email=email or None,
+                iam_user_id=iam_user_id,
                 password_hash="",  # SSO用户无本地密码
                 role="doctor",
                 status=True
@@ -106,11 +117,11 @@ class IAMService:
             self.db.add(user)
             self.db.commit()
             self.db.refresh(user)
-            logger.info(f"IAM自动创建用户: {username}")
+            logger.info(f"IAM自动创建用户: {unique_username} (iam_user_id={iam_user_id})")
 
             # 自动创建个人工作空间
             from app.services.workspace_service import ensure_user_workspace
-            ensure_user_workspace(self.db, user.id, username)
+            ensure_user_workspace(self.db, user.id, unique_username)
 
         return user
 

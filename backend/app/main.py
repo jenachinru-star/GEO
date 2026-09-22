@@ -1,4 +1,4 @@
-﻿from fastapi import FastAPI
+﻿from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -157,6 +157,28 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# usage_context中间件：HTTP请求自动设置user_id，使LLM调用能进行配额检查
+@app.middleware("http")
+async def usage_context_middleware(request: Request, call_next):
+    from app.services.iam_service import IAMService
+    from app.usage_context import usage_context
+    user_id = None
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        try:
+            payload = IAMService.verify_jwt(auth_header[7:])
+            user_id = payload.get("user_id") if payload else None
+        except Exception:
+            pass
+    ctx_token = usage_context.set(user_id=user_id, task_type="http_request", ref_id=None) if user_id else None
+    try:
+        response = await call_next(request)
+        return response
+    finally:
+        if ctx_token:
+            usage_context.reset(ctx_token)
 
 # 注册路由
 app.include_router(monitor_router)

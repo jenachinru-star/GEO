@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user_id
 from app.models.publish_account import PublishAccount
+from app.utils.crypto import encrypt, decrypt
 
 router = APIRouter(prefix="/api/v1/publish-accounts", tags=["发布账号"])
 
@@ -61,7 +62,7 @@ def create_account(
         user_id=user_id,
         platform=data.platform,
         account_name=data.account_name,
-        credential=data.credential,
+        credential=encrypt(data.credential),
         note=data.note,
         login_status="unknown",
     )
@@ -92,7 +93,7 @@ def update_account(
     if data.account_name is not None:
         account.account_name = data.account_name
     if data.credential is not None:
-        account.credential = data.credential
+        account.credential = encrypt(data.credential)
     if data.login_status is not None:
         account.login_status = data.login_status
     if data.note is not None:

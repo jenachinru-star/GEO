@@ -16,7 +16,7 @@ def get_competitors(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    query = db.query(Competitor).filter(Competitor.status == True)
+    query = db.query(Competitor).filter(Competitor.status == True, Competitor.user_id == user_id)
     if keyword:
         query = query.filter(Competitor.name.contains(keyword))
     items = query.order_by(Competitor.id.desc()).all()
@@ -25,7 +25,7 @@ def get_competitors(
 
 @router.post("", summary="新增竞品")
 def create_competitor(data: CompetitorCreate, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    c = Competitor(**data.model_dump())
+    c = Competitor(**data.model_dump(), user_id=user_id)
     db.add(c)
     db.commit()
     db.refresh(c)
@@ -34,7 +34,7 @@ def create_competitor(data: CompetitorCreate, db: Session = Depends(get_db), use
 
 @router.delete("/{competitor_id}", summary="删除竞品")
 def delete_competitor(competitor_id: int, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    c = db.query(Competitor).filter(Competitor.id == competitor_id).first()
+    c = db.query(Competitor).filter(Competitor.id == competitor_id, Competitor.user_id == user_id).first()
     if not c:
         return {"code": 404, "message": "竞品不存在"}
     c.status = False

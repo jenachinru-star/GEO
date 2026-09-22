@@ -1,4 +1,4 @@
-﻿import axios from 'axios'
+import axios from 'axios'
 import { message } from 'antd'
 
 const request = axios.create({
@@ -172,15 +172,15 @@ export const systemApi = {
 // ============ 鏁版嵁瀵煎嚭 API ============
 // 瀵煎嚭鏄枃浠朵笅杞斤紝闇€瑕佸崟鐙鐞嗭紙blob鍝嶅簲绫诲瀷锛屼笉璧扮粺涓€鎷︽埅鍣級
 const downloadFile = (url: string, filename: string) => {
-  return axios.get(`/geo/api/v1${url}`, {
+  return request.get(url, {
     responseType: 'blob',
     timeout: 120000
-  }).then((response) => {
-    const blob = new Blob([response.data], {
+  }).then((blob: any) => {
+    const file = new Blob([blob], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     })
     const link = document.createElement('a')
-    link.href = URL.createObjectURL(blob)
+    link.href = URL.createObjectURL(file)
     link.download = filename
     document.body.appendChild(link)
     link.click()

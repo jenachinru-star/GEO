@@ -7,11 +7,11 @@ class MonitorRecord(Base):
     """监测事实表"""
     __tablename__ = "geo_monitor_record"
     __table_args__ = (
-        UniqueConstraint('question_id', 'platform_code', 'detect_date', 'detect_round', name='uix_question_platform_date_round'),
+        UniqueConstraint('semantic_id', 'platform_code', 'detect_date', 'detect_round', name='uix_semantic_platform_date_round'),
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    question_id = Column(Integer, ForeignKey("geo_question.id"), nullable=False, index=True)
+    question_id = Column(Integer, ForeignKey("geo_question.id"), nullable=True, index=True)
     platform_code = Column(String(50), nullable=False, index=True)  # glm/minimax/...
     rank = Column(Integer, default=0)  # 排名，0=未提及
     mentioned = Column(Boolean, default=False)  # 是否提及

@@ -18,6 +18,7 @@ from app.database import get_db
 from app.deps import get_current_user_id
 from app.models.asset import AssetSource, AssetDocument, AssetNote
 from app.models.task import AsyncTask
+from app.utils.url_safety import is_safe_url
 
 logger = logging.getLogger(__name__)
 
@@ -151,6 +152,10 @@ def create_source(
     """
     # URL类型：先检测重复
     if req.source_type == "url" and req.url:
+        # SSRF防护：拒绝内网地址
+        if not is_safe_url(req.url):
+            raise HTTPException(status_code=400, detail="URL地址不安全，不允许采集内网地址")
+
         existing = db.query(AssetSource).filter(
             AssetSource.user_id == user_id,
             AssetSource.url == req.url,

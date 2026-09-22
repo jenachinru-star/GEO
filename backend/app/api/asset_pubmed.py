@@ -9,6 +9,7 @@ import json
 import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 from typing import Optional, List
 from pydantic import BaseModel
 
@@ -58,11 +59,15 @@ def search_pubmed(
 
         # 标记哪些已经导入过
         pmids = [p["pmid"] for p in result["papers"]]
-        existing = db.query(AssetSource).filter(
+        existing_query = db.query(AssetSource).filter(
             AssetSource.user_id == user_id,
             AssetSource.source_type == "pubmed",
-            AssetSource.url.in_contains(pmids) if pmids else False,
-        ).all()
+        )
+        if pmids:
+            existing_query = existing_query.filter(
+                or_(*[AssetSource.url.contains(pmid) for pmid in pmids])
+            )
+        existing = existing_query.all()
         existing_pmids = set()
         for s in existing:
             # 从url中提取pmid
