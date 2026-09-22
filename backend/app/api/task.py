@@ -83,7 +83,7 @@ def list_tasks(
     }}
 
 
-@router.post("/{task_id}/cancel", summary="取消任务（仅 queued 状态可取消）")
+@router.post("/{task_id}/cancel", summary="取消任务（queued直接取消，running标记取消中由执行线程终止）")
 def cancel_task(
     task_id: int,
     db: Session = Depends(get_db),
@@ -95,11 +95,20 @@ def cancel_task(
     ).first()
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
-    if task.status != "queued":
-        raise HTTPException(status_code=400, detail=f"仅 queued 状态的任务可取消，当前状态: {task.status}")
+    if task.status not in ("queued", "running"):
+        raise HTTPException(status_code=400, detail=f"仅 queued/running 状态的任务可取消，当前状态: {task.status}")
 
-    task.status = "cancelled"
-    task.finished_at = task.finished_at or datetime.now()
-    task.progress_message = "用户取消"
-    db.commit()
-    return {"code": 0, "message": "任务已取消"}
+    if task.status == "queued":
+        # 还未开始执行，直接标记为终态cancelled
+        task.status = "cancelled"
+        task.finished_at = task.finished_at or datetime.now()
+        task.progress_message = "用户取消"
+        db.commit()
+        return {"code": 0, "message": "任务已取消"}
+    else:
+        # 正在执行，标记为cancelling，由执行线程在下次进度回调时感知并终止
+        task.status = "cancelling"
+        task.progress_message = "用户取消中，正在停止..."
+        task.error_message = "用户主动取消任务"
+        db.commit()
+        return {"code": 0, "message": "任务正在取消，执行线程将在当前步骤完成后停止"}

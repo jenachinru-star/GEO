@@ -21,10 +21,16 @@ class CollectorEngine:
     def __init__(self, db: Session):
         self.db = db
         self.parser = AnswerParser(settings.brand_aliases)
+        self._failed_platforms = set()  # 本次采集中已确认故障的平台，熔断后跳过
 
     def query_single_platform(self, platform_code: str, question: str,
-                               retries: int = 2) -> tuple[bool, str]:
-        """向单个平台提问，带重试"""
+                               retries: int = 1) -> tuple[bool, str]:
+        """向单个平台提问，带重试和熔断（retries=1表示只尝试1次，重试由SDK层负责）"""
+        # 熔断检查：如果平台已被标记为故障，本次采集剩余语义直接跳过
+        if platform_code in self._failed_platforms:
+            logger.info(f"平台 {platform_code} 已熔断，跳过")
+            return False, f"平台 {platform_code} 本次采集中已故障，跳过"
+
         adapter = adapter_factory.get_adapter(platform_code)
         if not adapter:
             return False, f"平台 {platform_code} 未配置"
@@ -48,12 +54,18 @@ class CollectorEngine:
                     logger.warning(f"{platform_code} 调用失败: {last_error[:200]}")
                     if attempt < retries - 1:
                         continue
+                    # 调用失败，标记熔断（本次采集剩余语义跳过此平台）
+                    self._failed_platforms.add(platform_code)
+                    logger.warning(f"平台 {platform_code} 连续失败，本次采集剩余语义将跳过此平台")
                     return False, last_error
             except Exception as e:
                 last_error = f"{type(e).__name__}: {str(e)}"
                 logger.error(f"{platform_code} 调用异常: {last_error}")
                 if attempt < retries - 1:
                     continue
+                # 调用异常，标记熔断
+                self._failed_platforms.add(platform_code)
+                logger.warning(f"平台 {platform_code} 连续异常，本次采集剩余语义将跳过此平台")
                 return False, last_error
 
         return False, last_error

@@ -1,6 +1,6 @@
 // 任务中心页面 — 展示所有异步任务的状态和进度
 import { useState, useEffect, useCallback } from 'react'
-import { Table, Tag, Progress, Button, Space, Card, Typography, Empty, Badge, message, Tooltip } from 'antd'
+import { Table, Tag, Progress, Button, Space, Card, Typography, Empty, Badge, message, Tooltip, Popconfirm } from 'antd'
 import { ReloadOutlined, CheckCircleOutlined, CloseCircleOutlined, LoadingOutlined, ClockCircleOutlined, WarningOutlined } from '@ant-design/icons'
 import { taskApi } from '@/api'
 import { formatUtcTime as formatTime } from '@/utils/time'
@@ -21,6 +21,7 @@ const TASK_TYPE_NAMES: Record<string, string> = {
 const STATUS_CONFIG: Record<string, { color: string; label: string; icon: any }> = {
   queued: { color: 'default', label: '等待中', icon: <ClockCircleOutlined /> },
   running: { color: 'processing', label: '执行中', icon: <LoadingOutlined /> },
+  cancelling: { color: 'warning', label: '取消中', icon: <LoadingOutlined /> },
   succeeded: { color: 'success', label: '已完成', icon: <CheckCircleOutlined /> },
   failed: { color: 'error', label: '失败', icon: <CloseCircleOutlined /> },
   cancelled: { color: 'warning', label: '已取消', icon: <CloseCircleOutlined /> },
@@ -51,9 +52,9 @@ const TaskCenter = () => {
     fetchTasks()
   }, [fetchTasks])
 
-  // 自动刷新：有 running/queued 任务时每3秒刷新一次
+  // 自动刷新：有 running/queued/cancelling 任务时每10秒刷新一次
   useEffect(() => {
-    const hasActive = tasks.some(t => t.status === 'running' || t.status === 'queued')
+    const hasActive = tasks.some(t => t.status === 'running' || t.status === 'queued' || t.status === 'cancelling')
     if (!hasActive) return
     const timer = setInterval(fetchTasks, 10000)
     return () => clearInterval(timer)
@@ -98,6 +99,7 @@ const TaskCenter = () => {
         if (record.status === 'succeeded') return <Progress percent={100} size="small" status="success" />
         if (record.status === 'failed') return <Progress percent={100} size="small" status="exception" />
         if (record.status === 'cancelled') return <Progress percent={progress || 0} size="small" showInfo={false} />
+        if (record.status === 'cancelling') return <Progress percent={progress || 0} size="small" status="active" />
         if (record.status === 'running') return <Progress percent={progress || 0} size="small" status="active" />
         return <Progress percent={0} size="small" />
       },
@@ -131,13 +133,19 @@ const TaskCenter = () => {
       width: 100,
       render: (_: any, record: any) => (
         record.status === 'queued' ? (
-          <Button type="link" danger size="small" onClick={() => handleCancel(record.id)}>取消</Button>
+          <Popconfirm title="确定取消该任务？" onConfirm={() => handleCancel(record.id)} okText="取消任务" cancelText="再想想">
+            <Button type="link" danger size="small">取消</Button>
+          </Popconfirm>
+        ) : record.status === 'running' ? (
+          <Popconfirm title="确定取消正在执行的任务？已采集的部分数据将保留，但任务会标记为失败。" onConfirm={() => handleCancel(record.id)} okText="取消任务" cancelText="再想想">
+            <Button type="link" danger size="small">取消</Button>
+          </Popconfirm>
         ) : '-'
       ),
     },
   ]
 
-  const runningCount = tasks.filter(t => t.status === 'running' || t.status === 'queued').length
+  const runningCount = tasks.filter(t => t.status === 'running' || t.status === 'queued' || t.status === 'cancelling').length
 
   return (
     <div style={{ padding: 24 }}>

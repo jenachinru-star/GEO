@@ -9,7 +9,7 @@ Worker 主进程 — 从数据库轮询 queued 状态的任务并执行。
 注意：
 - API 进程不要启动 Worker（通过 APP_ROLE 环境变量区分）
 - Worker 单进程运行，不做多实例并发（避免任务重复执行）
-- 任务执行超时默认 600 秒，超时后标记为 failed
+- 任务执行超时按任务类型动态调整，超时后标记为 cancelling，由执行线程自行终止
 """
 import os
 import sys
@@ -37,10 +37,30 @@ logging.basicConfig(
 )
 logger = logging.getLogger("worker")
 
+
+class TaskCancelledError(Exception):
+    """任务被取消时抛出，用于在执行链中传递取消信号（协作式取消）"""
+    pass
+
+
 # 全局运行标志
 _running = True
-TASK_TIMEOUT_SECONDS = 600  # 任务超时时间
 POLL_INTERVAL = 3  # 轮询间隔（秒）
+
+# 任务超时时间（按任务类型），全量采集需要更长时间
+TASK_TIMEOUT_BY_TYPE = {
+    "geo_refresh": 3600,      # GEO全量采集：1小时（19语义×4平台串行约36分钟）
+    "monitor_collect": 1800,  # 品牌监测采集：30分钟
+    "asset_url_collect": 600, # 资产URL采集：10分钟
+    "asset_file_parse": 300,  # 资产文件解析：5分钟
+}
+TASK_TIMEOUT_DEFAULT = 600  # 默认超时时间
+CANCEL_GRACE_SECONDS = 300  # cancelling状态宽限期：超过此时间仍未终止则强制failed
+
+
+def get_task_timeout(task_type: str) -> int:
+    """根据任务类型获取超时时间"""
+    return TASK_TIMEOUT_BY_TYPE.get(task_type, TASK_TIMEOUT_DEFAULT)
 
 
 def get_friendly_error(e: Exception) -> str:
@@ -119,9 +139,10 @@ def claim_next_task(db: Session) -> AsyncTask | None:
 
     db.refresh(task)
 
-    # 排队超时检查：任务在队列中等待过久，直接标记failed不执行
-    if task.created_at and (datetime.utcnow() - task.created_at).total_seconds() > TASK_TIMEOUT_SECONDS:
-        logger.warning(f"任务 #{task.id} 排队超时（created_at={task.created_at}），标记为failed")
+    # 排队超时检查：任务在队列中等待过久（超过该任务类型超时的2倍），直接标记failed不执行
+    queue_timeout = get_task_timeout(task.task_type) * 2
+    if task.created_at and (datetime.utcnow() - task.created_at).total_seconds() > queue_timeout:
+        logger.warning(f"任务 #{task.id} 排队超时（created_at={task.created_at}, 阈值={queue_timeout}s），标记为failed")
         task.status = "failed"
         task.error_message = "任务排队超时"
         task.finished_at = datetime.utcnow()
@@ -161,6 +182,10 @@ def complete_task(db: Session, task: AsyncTask, result: dict = None, error: str 
     if task.status in ("succeeded", "failed", "cancelled"):
         logger.warning(f"任务 #{task.id} 已处于终态 {task.status}，忽略 complete_task 调用")
         return
+    # 如果任务被标记为 cancelling，只允许转 failed，不允许转 succeeded
+    if task.status == "cancelling" and not error:
+        logger.warning(f"任务 #{task.id} 处于 cancelling 状态，不允许标记为成功，按失败处理")
+        error = error or "任务执行超时，已自动取消"
 
     if error:
         task.status = "failed"
@@ -179,18 +204,44 @@ def complete_task(db: Session, task: AsyncTask, result: dict = None, error: str 
 
 
 def recover_stuck_tasks(db: Session):
-    """恢复卡住的任务（running超过超时时间的标记为failed）"""
-    timeout_threshold = datetime.now() - timedelta(seconds=TASK_TIMEOUT_SECONDS)
-    stuck_tasks = db.query(AsyncTask).filter(
+    """恢复卡住的任务：
+    1. running超过该任务类型超时时间 → 标记为cancelling，由执行线程自行终止
+    2. cancelling超过宽限期仍未终止 → 强制标记为failed（执行线程可能已崩溃）
+    """
+    now = datetime.now()
+
+    # 1. running 超时 → cancelling
+    running_tasks = db.query(AsyncTask).filter(
         AsyncTask.status == "running",
-        AsyncTask.started_at < timeout_threshold
+        AsyncTask.started_at.isnot(None)
     ).all()
 
-    for task in stuck_tasks:
-        logger.warning(f"任务 #{task.id} 超时（started_at={task.started_at}），标记为failed")
-        task.status = "failed"
-        task.error_message = f"任务执行超时（>{TASK_TIMEOUT_SECONDS}秒）"
-        task.finished_at = datetime.now()
+    for task in running_tasks:
+        timeout = get_task_timeout(task.task_type)
+        elapsed = (now - task.started_at).total_seconds()
+        if elapsed > timeout:
+            logger.warning(f"任务 #{task.id} 超时（type={task.task_type}, elapsed={elapsed:.0f}s > {timeout}s），标记为cancelling，等待执行线程终止")
+            task.status = "cancelling"
+            task.error_message = f"任务执行超时（>{timeout}秒），正在取消..."
+            task.progress_message = "任务超时，正在取消..."
+
+    # 2. cancelling 卡死 → 强制 failed（执行线程可能已崩溃，无法响应取消）
+    cancelling_tasks = db.query(AsyncTask).filter(
+        AsyncTask.status == "cancelling",
+        AsyncTask.started_at.isnot(None)
+    ).all()
+
+    for task in cancelling_tasks:
+        timeout = get_task_timeout(task.task_type)
+        elapsed = (now - task.started_at).total_seconds()
+        # 任务被标记cancelling时已经running超过timeout，再给CANCEL_GRACE_SECONDS宽限期
+        if elapsed > timeout + CANCEL_GRACE_SECONDS:
+            logger.warning(f"任务 #{task.id} 处于cancelling状态过久（elapsed={elapsed:.0f}s > {timeout + CANCEL_GRACE_SECONDS}s），执行线程可能已崩溃，强制标记为failed")
+            task.status = "failed"
+            task.error_message = "任务执行超时，已自动取消（执行线程无响应）"
+            task.progress_message = "任务超时，已强制取消"
+            task.finished_at = now
+
     db.commit()
 
 
@@ -202,7 +253,7 @@ def run_worker_loop():
     logger.info("=" * 50)
     logger.info("GEO Worker 启动（内嵌模式）")
     logger.info(f"已注册任务类型: {get_all_task_types()}")
-    logger.info(f"轮询间隔: {POLL_INTERVAL}秒 | 任务超时: {TASK_TIMEOUT_SECONDS}秒")
+    logger.info(f"轮询间隔: {POLL_INTERVAL}秒 | 任务超时: 按任务类型动态调整（默认{TASK_TIMEOUT_DEFAULT}秒）")
     logger.info("=" * 50)
 
     while _running:
@@ -217,6 +268,11 @@ def run_worker_loop():
             if task:
                 # 进度回调：更新任务进度和说明到数据库
                 def on_progress(current: int, total: int, message: str):
+                    # 检查任务是否被取消（recover_stuck_tasks标记cancelling，或用户取消标记cancelled）
+                    db.refresh(task)
+                    if task.status in ("cancelling", "cancelled"):
+                        logger.warning(f"任务 #{task.id} 被取消（status={task.status}），中断执行（进度 {current}/{total}）")
+                        raise TaskCancelledError(f"任务被取消，状态={task.status}")
                     task.progress = int(current / total * 100) if total > 0 else 100
                     short_msg = message[:80] if message else ""
                     task.progress_message = f"[{current}/{total}] {short_msg}"
@@ -225,7 +281,18 @@ def run_worker_loop():
 
                 try:
                     result = execute_task(db, task, on_progress)
-                    complete_task(db, task, result=result)
+                    # 检查是否被取消（执行过程中可能被标记为cancelling）
+                    db.refresh(task)
+                    if task.status == "cancelling":
+                        logger.info(f"任务 #{task.id} 执行完毕但已被标记取消，按失败处理")
+                        complete_task(db, task, error="任务执行超时，已自动取消")
+                    else:
+                        complete_task(db, task, result=result)
+                except TaskCancelledError as e:
+                    # 任务被取消（超时或用户主动取消），按失败处理
+                    db.rollback()
+                    logger.warning(f"任务 #{task.id} 因取消信号终止: {e}")
+                    complete_task(db, task, error="任务执行超时，已自动取消")
                 except Exception as e:
                     db.rollback()
                     # 原始错误完整信息记日志（含 traceback），不暴露给前端
