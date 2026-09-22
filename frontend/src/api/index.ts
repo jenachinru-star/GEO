@@ -3,13 +3,13 @@ import { message } from 'antd'
 
 const request = axios.create({
   baseURL: '/geo/api/v1',
-  timeout: 180000,  // GEO/AEO閲囬泦鍙兘闇€瑕?-3鍒嗛挓
+  timeout: 180000,  // GEO/AEO采集可能需要1-3分钟
   headers: {
     'Content-Type': 'application/json'
   }
 })
 
-// 璇锋眰鎷︽埅鍣?
+// 请求拦截器
 request.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('geo_token')
@@ -23,7 +23,7 @@ request.interceptors.request.use(
   }
 )
 
-// 鍝嶅簲鎷︽埅鍣?
+// 响应拦截器
 // 友好错误提示映射
 const friendlyErrorMap: Record<number, string> = {
   400: '请求参数有误，请检查后重试',
@@ -103,13 +103,13 @@ request.interceptors.response.use(
   }
 )
 
-// ============ 浠〃鐩?API ============
+// ============ 仪表盘 API ============
 export const dashboardApi = {
   getStats: () => request.get('/dashboard/stats'),
   getDoctorStats: () => request.get('/dashboard/doctor-stats'),
 }
 
-// ============ GEO/AEO鏁版嵁 API ============
+// ============ GEO/AEO数据 API ============
 export const geoApi = {
   getOverview: () => request.get('/geo/overview'),
   getSemanticDetail: (id: number, days = 7) => request.get(`/geo/semantic/${id}`, { params: { days } }),
@@ -117,7 +117,7 @@ export const geoApi = {
   refresh: () => request.post('/geo/refresh'),
 }
 
-// ============ 鐩戞祴涓績 API ============
+// ============ 监测中心 API ============
 export const monitorApi = {
   getQuestions: (params?: any) => request.get('/monitor/questions', { params }),
   createQuestion: (data: any) => request.post('/monitor/questions', data),
@@ -129,7 +129,7 @@ export const monitorApi = {
   collect: (data: any) => request.post('/monitor/collect', data)
 }
 
-// ============ 鍐呭璧勪骇 API ============
+// ============ 内容资产 API ============
 export const contentApi = {
   getList: (params?: any) => request.get('/content', { params }),
   create: (data: any) => request.post('/content', data),
@@ -137,7 +137,7 @@ export const contentApi = {
   delete: (id: number) => request.delete(`/content/${id}`)
 }
 
-// ============ 鐭ヨ瘑搴?API ============
+// ============ 知识库 API ============
 export const knowledgeApi = {
   getList: (params?: any) => request.get('/knowledge', { params }),
   create: (data: any) => request.post('/knowledge', data),
@@ -148,7 +148,7 @@ export const knowledgeApi = {
   rebuildEmbeddings: () => request.post('/knowledge/rebuild-embeddings')
 }
 
-// ============ 绔炲搧 API ============
+// ============ 竞品 API ============
 export const competitorApi = {
   getList: (params?: any) => request.get('/competitor', { params }),
   create: (data: any) => request.post('/competitor', data),
@@ -156,21 +156,21 @@ export const competitorApi = {
   getRecords: (params?: any) => request.get('/competitor/records', { params })
 }
 
-// ============ RAG闂瓟 API ============
+// ============ RAG问答 API ============
 export const ragApi = {
   query: (data: any) => request.post('/rag/query', data),
   getPlatforms: () => request.get('/rag/platforms')
 }
 
-// ============ 绯荤粺 API ============
+// ============ 系统 API ============
 export const systemApi = {
   getInfo: () => request.get('/system/info'),
   getPlatforms: () => request.get('/system/platforms'),
   initDemo: () => request.post('/system/init-demo')
 }
 
-// ============ 鏁版嵁瀵煎嚭 API ============
-// 瀵煎嚭鏄枃浠朵笅杞斤紝闇€瑕佸崟鐙鐞嗭紙blob鍝嶅簲绫诲瀷锛屼笉璧扮粺涓€鎷︽埅鍣級
+// ============ 数据导出 API ============
+// 导出是文件下载，需要单独处理（blob响应类型，不走统一拦截器）
 const downloadFile = (url: string, filename: string) => {
   return request.get(url, {
     responseType: 'blob',
@@ -186,25 +186,25 @@ const downloadFile = (url: string, filename: string) => {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(link.href)
-    message.success('瀵煎嚭鎴愬姛')
+    message.success('导出成功')
   }).catch(() => {
-    message.error('瀵煎嚭澶辫触')
+    message.error('导出失败')
   })
 }
 
 export const exportApi = {
   exportMonitor: (questionId?: number) => {
     const params = questionId ? `?question_id=${questionId}` : ''
-    return downloadFile(`/export/monitor${params}`, `鐩戞祴璁板綍_${Date.now()}.xlsx`)
+    return downloadFile(`/export/monitor${params}`, `监测记录_${Date.now()}.xlsx`)
   },
-  exportQuestions: () => downloadFile('/export/questions', `鐩戞祴闂_${Date.now()}.xlsx`),
-  exportKnowledge: () => downloadFile('/export/knowledge', `鐭ヨ瘑搴揰${Date.now()}.xlsx`),
-  exportContent: () => downloadFile('/export/content', `鍐呭璧勪骇_${Date.now()}.xlsx`),
-  exportReport: () => downloadFile('/export/report', `GEO瀹屾暣鎶ュ憡_${Date.now()}.xlsx`),
-  exportDoctorReport: () => downloadFile('/export/doctor-report', `GEO鍖荤敓鎶ュ憡_${Date.now()}.xlsx`),
+  exportQuestions: () => downloadFile('/export/questions', `监测问题_${Date.now()}.xlsx`),
+  exportKnowledge: () => downloadFile('/export/knowledge', `知识库_${Date.now()}.xlsx`),
+  exportContent: () => downloadFile('/export/content', `内容资产_${Date.now()}.xlsx`),
+  exportReport: () => downloadFile('/export/report', `GEO完整报告_${Date.now()}.xlsx`),
+  exportDoctorReport: () => downloadFile('/export/doctor-report', `GEO医生报告_${Date.now()}.xlsx`),
 }
 
-// ============ 璁よ瘉 API ============
+// ============ 认证 API ============
 export const authApi = {
   getIamUrl: () => request.get('/auth/iam/url'),
   exchangeTicket: (ticket: string) => request.post('/auth/iam/exchange', null, { params: { ticket } }),
@@ -215,14 +215,14 @@ export const authApi = {
   getIamStatus: () => request.get('/auth/status')
 }
 
-// ============ 鍖荤敓Profile API ============
+// ============ 医生Profile API ============
 export const doctorApi = {
   getProfile: () => request.get('/doctor/profile'),
   saveProfile: (data: any) => request.post('/doctor/profile', data),
   regenerateSemantics: () => request.post('/doctor/regenerate-semantics'),
 }
 
-// ============ 璇箟搴?API ============
+// ============ 语义库 API ============
 export const semanticApi = {
   getList: (params?: any) => request.get('/semantic', { params }),
   toggle: (id: number) => request.post(`/semantic/${id}/toggle`),
@@ -233,7 +233,7 @@ export const semanticApi = {
     request.post('/semantic/extend/save', data),
 }
 
-// ============ 鏂囩珷绠＄悊 API ============
+// ============ 文章管理 API ============
 export const articleApi = {
   getList: (params?: any) => request.get('/article', { params }),
   create: (data: any) => request.post('/article', data),
@@ -243,19 +243,19 @@ export const articleApi = {
   validate: (id: number) => request.post(`/article/${id}/validate`),
 }
 
-// ============ 瀹炰綋涓€鑷存€?API ============
+// ============ 实体一致性 API ============
 export const entityApi = {
   getProfileScore: () => request.get('/entity/profile-score'),
 }
 
-// ============ 鏂囩珷妯℃澘 API ============
+// ============ 文章模板 API ============
 export const templateApi = {
   generateArticle: (semanticId: number, opportunityId?: number) =>
     request.get(`/template/article/${semanticId}`, { params: opportunityId ? { opportunity_id: opportunityId } : {} }),
   generateLlms: () => request.get('/template/llms.txt', { responseType: 'text' }),
 }
 
-// ============ 鏂囩珷鍒嗗彂 API ============
+// ============ 文章分发 API ============
 export const distributionApi = {
   getList: (params?: any) => request.get('/distribution', { params }),
   create: (data: any) => request.post('/distribution', data),
@@ -267,12 +267,12 @@ export const distributionApi = {
   recollect: (id: number) => request.post(`/distribution/${id}/recollect`),
 }
 
-// ============ 宸ュ叿閰嶇疆 API ============
+// ============ 工具配置 API ============
 export const toolsApi = {
   getConfig: () => request.get('/tools/config'),
 }
 
-// ============ 寮傛浠诲姟 API ============
+// ============ 异步任务 API ============
 export const taskApi = {
   get: (id: number) => request.get(`/task/${id}`),
   list: (params?: { task_type?: string; status?: string; page?: number; page_size?: number }) =>
@@ -280,7 +280,7 @@ export const taskApi = {
   cancel: (id: number) => request.post(`/task/${id}/cancel`),
 }
 
-// ============ 鍐呭鏈轰細 API ============
+// ============ 内容机会 API ============
 export const opportunityApi = {
   list: (params?: { status?: string; opportunity_type?: string }) =>
     request.get('/opportunity', { params }),

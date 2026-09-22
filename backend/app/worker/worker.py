@@ -120,11 +120,11 @@ def claim_next_task(db: Session) -> AsyncTask | None:
     db.refresh(task)
 
     # 排队超时检查：任务在队列中等待过久，直接标记failed不执行
-    if task.created_at and (datetime.now() - task.created_at).total_seconds() > TASK_TIMEOUT_SECONDS:
+    if task.created_at and (datetime.utcnow() - task.created_at).total_seconds() > TASK_TIMEOUT_SECONDS:
         logger.warning(f"任务 #{task.id} 排队超时（created_at={task.created_at}），标记为failed")
         task.status = "failed"
         task.error_message = "任务排队超时"
-        task.finished_at = datetime.now()
+        task.finished_at = datetime.utcnow()
         db.commit()
         return None
 

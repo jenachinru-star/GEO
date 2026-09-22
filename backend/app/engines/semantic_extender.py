@@ -98,33 +98,38 @@ class SemanticExtender:
         return results
 
     def _generate_synonyms(self, question: str) -> List[str]:
-        """用LLM生成同义变体"""
-        adapter = self._get_adapter()
-        if not adapter:
+        """用LLM生成同义变体（带平台 failover）"""
+        adapters = self._get_adapters()
+        if not adapters:
             return []
 
         user_prompt = f"原问题：{question}\n\n请生成这个问题的同义变体（3-5个）。"
-        try:
-            result: QueryResult = adapter.query(user_prompt, system_prompt=self.SYNONYM_SYSTEM_PROMPT)
-            if not result.success:
-                logger.warning(f"同义变体LLM调用失败: {result.error}")
-                return []
-            return self._parse_questions(result.answer)
-        except Exception as e:
-            logger.error(f"同义变体生成异常: {e}")
-            return []
+        for code, adapter in adapters:
+            try:
+                result: QueryResult = adapter.query(user_prompt, system_prompt=self.SYNONYM_SYSTEM_PROMPT)
+                if result.success:
+                    questions = self._parse_questions(result.answer)
+                    if questions:
+                        logger.info(f"同义变体生成使用平台: {code}")
+                        return questions
+                else:
+                    logger.warning(f"同义变体平台 {code} 调用失败: {result.error}，尝试下一个平台")
+            except Exception as e:
+                logger.warning(f"同义变体平台 {code} 异常: {e}，尝试下一个平台")
+        logger.warning("同义变体所有平台均失败")
+        return []
 
     def _generate_deep(self, question: str, profile: dict = None) -> List[str]:
-        """用LLM生成深度延伸"""
+        """用LLM生成深度延伸（带平台 failover）"""
         if not profile:
-            return []
-
-        adapter = self._get_adapter()
-        if not adapter:
             return []
 
         specialty = profile.get('specialty', '')
         if not specialty:
+            return []
+
+        adapters = self._get_adapters()
+        if not adapters:
             return []
 
         user_prompt = (
@@ -132,23 +137,33 @@ class SemanticExtender:
             f"医生专长：{specialty}\n\n"
             f"请基于医生的专长疾病，把这个泛化问题具体化为深度延伸问题（2-3个）。"
         )
-        try:
-            result: QueryResult = adapter.query(user_prompt, system_prompt=self.DEEP_SYSTEM_PROMPT)
-            if not result.success:
-                logger.warning(f"深度延伸LLM调用失败: {result.error}")
-                return []
-            return self._parse_questions(result.answer)
-        except Exception as e:
-            logger.error(f"深度延伸生成异常: {e}")
-            return []
+        for code, adapter in adapters:
+            try:
+                result: QueryResult = adapter.query(user_prompt, system_prompt=self.DEEP_SYSTEM_PROMPT)
+                if result.success:
+                    questions = self._parse_questions(result.answer)
+                    if questions:
+                        logger.info(f"深度延伸生成使用平台: {code}")
+                        return questions
+                else:
+                    logger.warning(f"深度延伸平台 {code} 调用失败: {result.error}，尝试下一个平台")
+            except Exception as e:
+                logger.warning(f"深度延伸平台 {code} 异常: {e}，尝试下一个平台")
+        logger.warning("深度延伸所有平台均失败")
+        return []
 
-    def _get_adapter(self):
+    def _get_adapters(self):
+        """返回所有已启用平台的适配器列表（按优先级顺序），用于 failover"""
         if self.platform_code:
-            return adapter_factory.get_adapter(self.platform_code)
+            adapter = adapter_factory.get_adapter(self.platform_code)
+            return [(self.platform_code, adapter)] if adapter else []
         platforms = adapter_factory.get_enabled_platforms()
-        if platforms:
-            return adapter_factory.get_adapter(platforms[0])
-        return None
+        adapters = []
+        for code in platforms:
+            adapter = adapter_factory.get_adapter(code)
+            if adapter:
+                adapters.append((code, adapter))
+        return adapters
 
     def _parse_questions(self, answer: str) -> List[str]:
         """解析LLM回答，提取问题列表"""
