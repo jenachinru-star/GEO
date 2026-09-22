@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+﻿import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Form, Input, Button, Tabs, message, Typography } from 'antd'
 import {
@@ -260,7 +260,10 @@ const Login = () => {
 
           <Tabs
             activeKey={activeTab}
-            onChange={setActiveTab}
+            onChange={(key) => {
+              setActiveTab(key)
+              setEmailCheck(null)
+            }}
             centered
             items={[
               {
@@ -276,28 +279,13 @@ const Login = () => {
                     <Form.Item
                       name="email"
                       rules={[
-                        { required: true, message: '请输入邮箱' },
-                        { type: 'email', message: '请输入正确的邮箱地址' },
+                        { required: true, message: '请输入账号或邮箱' },
                       ]}
-                      extra={
-                        emailCheck?.exists ? (
-                          <span style={{ color: '#ff4d4f', fontSize: 12 }}>
-                            该邮箱已注册，
-                            <a onClick={() => setActiveTab('login')} style={{ cursor: 'pointer' }}>
-                              去登录
-                            </a>
-                          </span>
-                        ) : emailCheck && !emailCheck.exists && !emailCheck.loading ? (
-                          <span style={{ color: '#52c41a', fontSize: 12 }}>该邮箱可注册</span>
-                        ) : null
-                      }
-                      validateStatus={emailCheck?.exists ? 'error' : undefined}
                     >
                       <Input
                         prefix={<MailOutlined style={{ color: '#bfbfbf' }} />}
-                        placeholder="邮箱地址"
-                        autoComplete="email"
-                        onBlur={(e) => handleCheckEmail(e.target.value)}
+                        placeholder="账号 / 邮箱"
+                        autoComplete="username"
                       />
                     </Form.Item>
 
@@ -490,3 +478,5 @@ const Login = () => {
 }
 
 export default Login
+
+

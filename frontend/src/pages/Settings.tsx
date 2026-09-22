@@ -8,6 +8,7 @@ import {
   ReloadOutlined, PlayCircleOutlined, DatabaseOutlined
 } from '@ant-design/icons'
 import { systemApi, monitorApi, taskApi } from '@/api'
+import PlatformConfig from '@/components/PlatformConfig'
 
 const Settings = () => {
   const [systemInfo, setSystemInfo] = useState<any>(null)
@@ -65,7 +66,7 @@ const Settings = () => {
         return
       }
       // /monitor/collect 是异步任务：POST 只返回 task_id，采集在 worker 后台执行
-      message.loading({ content: `采集任务 #${taskId} 已提交，正在后台执行...`, key: loadingKey, duration: 0 })
+      message.success({ content: `数据采集已开始，可在任务中心查看进度`, key: loadingKey, duration: 3 })
 
       let pollCount = 0
       const maxPolls = 600
@@ -138,34 +139,9 @@ const Settings = () => {
         </Descriptions>
       </div>
 
-      {/* 平台状态 */}
-      <div className="geo-card" style={{ marginBottom: 16 }}>
-        <h3 style={{ fontSize: 15, marginBottom: 16 }}>AI平台配置状态</h3>
-        <Table
-          dataSource={platforms}
-          rowKey="code"
-          pagination={false}
-          columns={[
-            { title: '平台', dataIndex: 'name', key: 'name', render: (t: string) => <span style={{ fontWeight: 500 }}>{t}</span> },
-            { title: '标识', dataIndex: 'code', key: 'code' },
-            { title: '模型', dataIndex: 'model', key: 'model', render: (t: string) => t || '-' },
-            {
-              title: 'API配置', dataIndex: 'configured', key: 'configured', width: 100,
-              render: (v: boolean) => v
-                ? <Tag color="green" icon={<CheckCircleOutlined />}>已配置</Tag>
-                : <Tag color="default" icon={<CloseCircleOutlined />}>未配置</Tag>
-            },
-            {
-              title: '状态', dataIndex: 'enabled', key: 'enabled', width: 100,
-              render: (v: boolean) => v
-                ? <Tag color="success">运行中</Tag>
-                : <Tag color="default">未启用</Tag>
-            }
-          ]}
-        />
-        <div style={{ marginTop: 12, fontSize: 12, color: '#64748B' }}>
-          提示：平台配置在 backend/.env 文件中修改，修改后重启服务生效
-        </div>
+      {/* 平台配置管理 */}
+      <div style={{ marginBottom: 16 }}>
+        <PlatformConfig />
       </div>
 
       {/* 快捷操作 */}

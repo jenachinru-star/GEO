@@ -179,6 +179,8 @@ def import_pubmed(
 
     doc = AssetDocument(
         source_id=source.id,
+        is_current=True,
+        version=1,
         user_id=user_id,
         title=paper["title"],
         content=content,

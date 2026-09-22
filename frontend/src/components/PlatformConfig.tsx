@@ -8,7 +8,7 @@ import {
   PauseCircleOutlined, ApiOutlined, ReloadOutlined, CheckCircleOutlined,
   CloseCircleOutlined, ExperimentOutlined, SyncOutlined
 } from '@ant-design/icons'
-import { platformApi } from '@/api'
+import { platformsApi } from '@/api'
 
 const { TextArea } = Input
 
@@ -37,7 +37,7 @@ const PlatformConfig = () => {
   const loadPlatforms = async () => {
     setLoading(true)
     try {
-      const res: any = await platformApi.getList()
+      const res: any = await platformsApi.getList()
       setPlatforms(res.data || [])
     } catch (e) {
       console.error('加载平台列表失败', e)
@@ -67,7 +67,7 @@ const PlatformConfig = () => {
   const handleEdit = (record: any) => {
     setEditingPlatform(record)
     // 编辑时需要获取完整信息（含 api_key）
-    platformApi.getDetail(record.code).then((res: any) => {
+    platformsApi.getDetail(record.code).then((res: any) => {
       form.setFieldsValue(res.data)
       setModalVisible(true)
     }).catch(() => {
@@ -79,10 +79,10 @@ const PlatformConfig = () => {
     try {
       const values = await form.validateFields()
       if (editingPlatform) {
-        await platformApi.update(editingPlatform.code, values)
+        await platformsApi.update(editingPlatform.code, values)
         message.success('平台配置更新成功')
       } else {
-        await platformApi.create(values)
+        await platformsApi.create(values)
         message.success('平台创建成功')
       }
       setModalVisible(false)
@@ -95,7 +95,7 @@ const PlatformConfig = () => {
 
   const handleToggle = async (record: any) => {
     try {
-      await platformApi.toggle(record.code)
+      await platformsApi.toggle(record.code)
       message.success(record.status ? '已停用' : '已启用')
       loadPlatforms()
     } catch (e) {
@@ -105,7 +105,7 @@ const PlatformConfig = () => {
 
   const handleDelete = async (record: any) => {
     try {
-      await platformApi.delete(record.code)
+      await platformsApi.delete(record.code)
       message.success('删除成功')
       loadPlatforms()
     } catch (e) {
@@ -117,7 +117,7 @@ const PlatformConfig = () => {
     setTesting(true)
     setTestResult(null)
     try {
-      const res: any = await platformApi.test({ platform_code: record.code })
+      const res: any = await platformsApi.test({ platform_code: record.code })
       setTestResult(res.data)
       if (res.data?.success) {
         message.success('连接成功')
@@ -134,7 +134,7 @@ const PlatformConfig = () => {
   const handleReload = async () => {
     setReloading(true)
     try {
-      await platformApi.reload()
+      await platformsApi.reload()
       message.success('适配器重载成功')
       loadPlatforms()
     } catch (e) {

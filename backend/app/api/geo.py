@@ -14,7 +14,7 @@ from app.engines.collector import CollectorEngine
 from app.adapters import adapter_factory
 import json
 from app.models.task import AsyncTask
-from app.models.workspace import WorkspaceMember
+from app.services.workspace_service import get_user_workspace_id
 
 router = APIRouter(prefix="/api/v1/geo", tags=["GEO/AEO数据"])
 
@@ -217,11 +217,7 @@ def refresh_data(db: Session = Depends(get_db), user_id: int = Depends(get_curre
         raise HTTPException(status_code=400, detail="没有已配置的AI平台")
 
     # 获取用户默认 workspace_id
-    ws_member = db.query(WorkspaceMember).filter(
-        WorkspaceMember.user_id == user_id,
-        WorkspaceMember.role == "owner"
-    ).first()
-    workspace_id = ws_member.workspace_id if ws_member else None
+    workspace_id = get_user_workspace_id(db, user_id)
 
     # 检查是否已有 running 的同类型任务（防止重复提交）
     running_task = db.query(AsyncTask).filter(

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+﻿import { useState, useEffect } from 'react'
 import {
   Table, Button, Space, Tag, Modal, Form, Select, Input,
   message, Popconfirm
@@ -8,6 +8,7 @@ import {
   CheckCircleOutlined, CloseCircleOutlined
 } from '@ant-design/icons'
 import { PUBLISH_PLATFORMS, PUBLISH_PLATFORM_NAMES } from '@/store/useStore'
+import request from '@/api'
 
 const { TextArea } = Input
 
@@ -37,12 +38,10 @@ const PublishAccounts = () => {
   const loadList = async () => {
     setLoading(true)
     try {
-      const res: any = await fetch('/api/v1/publish-accounts', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }).then(r => r.json())
+      const res: any = await request.get('/publish-accounts')
       setList(res.data?.items || [])
     } catch (e) {
-      message.error('加载失败')
+      // 错误提示已由拦截器统一弹出
     } finally {
       setLoading(false)
     }
@@ -54,46 +53,33 @@ const PublishAccounts = () => {
 
   const handleCreate = async (values: any) => {
     try {
-      await fetch('/api/v1/publish-accounts', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(values)
-      }).then(r => r.json())
+      await request.post('/publish-accounts', values)
       message.success('添加成功')
       setModalVisible(false)
       form.resetFields()
       loadList()
     } catch (e) {
-      message.error('添加失败')
+      // 错误提示已由拦截器统一弹出
     }
   }
 
   const handleVerify = async (id: number) => {
     try {
-      await fetch(`/api/v1/publish-accounts/${id}/verify`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }).then(r => r.json())
+      await request.post(`/publish-accounts/${id}/verify`)
       message.success('已标记为有效')
       loadList()
     } catch (e) {
-      message.error('操作失败')
+      // 错误提示已由拦截器统一弹出
     }
   }
 
   const handleDelete = async (id: number) => {
     try {
-      await fetch(`/api/v1/publish-accounts/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      }).then(r => r.json())
+      await request.delete(`/publish-accounts/${id}`)
       message.success('已删除')
       loadList()
     } catch (e) {
-      message.error('删除失败')
+      // 错误提示已由拦截器统一弹出
     }
   }
 
@@ -215,3 +201,6 @@ const PublishAccounts = () => {
 }
 
 export default PublishAccounts
+
+
+

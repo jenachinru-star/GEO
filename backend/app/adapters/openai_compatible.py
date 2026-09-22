@@ -56,9 +56,12 @@ class OpenAICompatibleAdapter(BaseAdapter):
             logger.error(f"提取{self.platform_code}回答失败: {e}")
             return ""
 
-    def query(self, question: str, system_prompt: Optional[str] = None) -> QueryResult:
+    def query(self, question: str, system_prompt: Optional[str] = None, **kwargs) -> QueryResult:
         try:
             logger.info(f"{self.platform_code}请求: model={self.model}, temp={self.temperature}, question={question[:50]}")
+
+            # 配额+平台开关前置检查（从 context 读 user_id，系统任务跳过）
+            self._check_quota_and_platform()
 
             messages = []
             if system_prompt:
@@ -74,31 +77,100 @@ class OpenAICompatibleAdapter(BaseAdapter):
 
             answer = self._extract_answer(response)
 
+            # 提取 token 用量
+            prompt_tokens = getattr(response.usage, 'prompt_tokens', 0) or 0
+            completion_tokens = getattr(response.usage, 'completion_tokens', 0) or 0
+            total_tokens = getattr(response.usage, 'total_tokens', 0) or (prompt_tokens + completion_tokens)
+
+            # 自动记录用量日志
+            self._log_usage(prompt_tokens, completion_tokens, total_tokens, success=True)
+
             if answer:
                 logger.info(f"{self.platform_code}回答长度: {len(answer)}")
                 return QueryResult(
                     platform_code=self.platform_code,
                     answer=answer,
                     success=True,
-                    raw_response=response.model_dump() if hasattr(response, 'model_dump') else None
+                    raw_response=response.model_dump() if hasattr(response, 'model_dump') else None,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
                 )
             else:
                 return QueryResult(
                     platform_code=self.platform_code,
                     answer="",
                     success=False,
-                    error="模型返回空回答（可能是思考模型或内容审核）"
+                    error="模型返回空回答（可能是思考模型或内容审核）",
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
                 )
 
         except Exception as e:
-            error_msg = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+            error_msg = f"{type(e).__name__}: {str(e)}"
             logger.error(f"{self.platform_code}调用异常: {error_msg[:500]}")
+            # 失败也记录用量（token=0）
+            self._log_usage(0, 0, 0, success=False, error_type=type(e).__name__)
             return QueryResult(
                 platform_code=self.platform_code,
                 answer="",
                 success=False,
                 error=error_msg
             )
+
+    def _check_quota_and_platform(self):
+        """配额+平台开关检查。无 user_id（系统任务）则跳过。"""
+        try:
+            from app.usage_context import usage_context
+            from app.database import SessionLocal
+            from app.services.quota_checker import check_all, QuotaError
+
+            ctx = usage_context.get() or {}
+            user_id = ctx.get("user_id")
+            if not user_id:
+                return  # 系统任务，跳过
+
+            db = SessionLocal()
+            try:
+                check_all(db, user_id, self.platform_code)
+            finally:
+                db.close()
+
+        except QuotaError as e:
+            # 配额不通过，直接返回错误结果，不发HTTP请求
+            logger.warning(f"{self.platform_code}配额检查未通过: {e.message}")
+            raise
+        except Exception as e:
+            # 检查本身出错不阻塞主流程
+            logger.warning(f"{self.platform_code}配额检查异常（不阻塞）: {e}")
+
+    def _log_usage(self, prompt_tokens: int, completion_tokens: int, total_tokens: int,
+                   success: bool, error_type: str = ""):
+        """记录 LLM 用量日志（从 usage_context 读上下文）"""
+        try:
+            from app.usage_logger import usage_logger
+            from app.usage_context import usage_context
+
+            ctx = usage_context.get() or {}
+            usage_logger.log(
+                platform=self.platform_code,
+                model=self.model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                user_id=ctx.get("user_id"),
+                workspace_id=ctx.get("workspace_id"),
+                task_type=ctx.get("task_type"),
+                ref_id=ctx.get("ref_id"),
+                ref_type=ctx.get("ref_type"),
+                success=success,
+                error_type=error_type or None,
+                latency_ms=0,  # TODO: 可加计时
+                source=ctx.get("source", "http"),
+            )
+        except Exception as e:
+            logger.warning(f"{self.platform_code}用量日志记录失败（不影响主流程）: {e}")
 
     def get_platform_code(self) -> str:
         return self.platform_code

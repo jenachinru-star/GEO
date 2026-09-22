@@ -43,3 +43,12 @@ Thumbs.db
 
 # ---- 影子实验产物（可能包含模型原始回答，禁止提交） ----
 /artifacts/shadow/
+
+# ---- 代码审查报告（临时分析文件，不提交） ----
+*审查报告*.md
+*CODE_REVIEW*.md
+review_*.md
+*调研报告*.md
+*优化方案*.md
+_query_db.py
+_patch_*.py

@@ -24,18 +24,81 @@ request.interceptors.request.use(
 )
 
 // 鍝嶅簲鎷︽埅鍣?
+// 友好错误提示映射
+const friendlyErrorMap: Record<number, string> = {
+  400: '请求参数有误，请检查后重试',
+  401: '登录已过期，请重新登录',
+  403: '您没有权限执行此操作',
+  404: '请求的内容不存在',
+  429: '操作太频繁，请稍后再试',
+  500: '服务器开小差了，请稍后再试',
+  502: '服务器暂时不可用，请稍后再试',
+  503: '服务维护中，请稍后再试',
+  504: '请求超时，请检查网络后重试',
+}
+
+const getFriendlyError = (error: any): string => {
+  const status = error.response?.status
+  const backendMsg = error.response?.data?.detail || error.response?.data?.message || ''
+
+  // 登录相关错误特殊处理
+  if (backendMsg.includes('邮箱或密码') || backendMsg.includes('用户名或密码')) {
+    return '邮箱或密码不正确，请检查后重试'
+  }
+  // 登录接口的401也按密码错误处理
+  if (status === 401 && error.config?.url?.includes('/auth/local/login')) {
+    return '邮箱或密码不正确，请检查后重试'
+  }
+  if (backendMsg.includes('未注册')) {
+    return '该邮箱尚未注册，请先注册账号'
+  }
+  if (backendMsg.includes('已注册')) {
+    return '该邮箱已被注册，请直接登录'
+  }
+  if (backendMsg.includes('验证码')) {
+    return '验证码错误或已过期，请重新获取'
+  }
+
+  // 网络错误
+  if (error.message === 'Network Error') {
+    return '网络连接失败，请检查网络后重试'
+  }
+  if (error.message.includes('timeout')) {
+    return '请求超时，请检查网络后重试'
+  }
+
+  // 按状态码映射
+  if (status && friendlyErrorMap[status]) {
+    return friendlyErrorMap[status]
+  }
+
+  // 默认提示
+  return '操作失败，请稍后再试'
+}
+
+// 响应拦截器
 request.interceptors.response.use(
   (response) => {
     const res = response.data
-    if (res.code !== 0 && res.code !== undefined) {
-      message.error(res.message || '璇锋眰澶辫触')
-      return Promise.reject(new Error(res.message || '璇锋眰澶辫触'))
+    if (res.code !== 0 && res.code !== undefined && res.code !== 1 && res.code !== 2) {
+      const friendlyMsg = getFriendlyError(res)
+      message.error(friendlyMsg)
+      return Promise.reject(new Error(friendlyMsg))
     }
     return res
   },
   (error) => {
-    const msg = error.response?.data?.message || error.message || '缃戠粶閿欒'
-    message.error(msg)
+    const friendlyMsg = getFriendlyError(error)
+    message.error(friendlyMsg)
+
+    // 401 自动跳转登录页
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/local/login')) {
+      setTimeout(() => {
+        localStorage.removeItem('geo_token')
+        window.location.href = '/geo/login'
+      }, 1500)
+    }
+
     return Promise.reject(error)
   }
 )
@@ -242,6 +305,47 @@ export const localAuthApi = {
     request.post('/auth/local/change-password', { old_password, new_password }),
 }
 
+export const usageApi = {
+  getOverview: (days: number) => request.get('/usage/overview', { params: { days } }),
+  getTrend: (days: number) => request.get('/usage/trend', { params: { days } }),
+  getByTaskType: (days: number) => request.get('/usage/by-task-type', { params: { days } }),
+  getByPlatform: (days: number) => request.get('/usage/by-platform', { params: { days } }),
+  getByUser: (days: number, limit: number) => request.get('/usage/by-user', { params: { days, limit } }),
+  getLogs: (params: any) => request.get('/usage/logs', { params }),
+}
+
+// 用量治理：平台开关 + 配额
+export const usageGovernanceApi = {
+  getAvailablePlatforms: () => request.get('/usage/platforms/available'),
+  getMyPref: () => request.get('/usage/platforms/pref'),
+  updatePref: (platform_code: string, enabled: boolean) =>
+    request.put('/usage/platforms/pref', { platform_code, enabled }),
+  getMyQuota: () => request.get('/usage/quota/my'),
+  adminListUsersQuota: () => request.get('/usage/quota/admin/users'),
+  adminUpdateQuota: (user_id: number, monthly_cost_limit: number) =>
+    request.put(`/usage/quota/admin/${user_id}`, { monthly_cost_limit }),
+  adminUsageReport: () => request.get('/usage/admin/user-platform'),
+  adminListUsers: () => request.get('/usage/admin/users'),
+  adminChangeRole: (user_id: number, role: string) =>
+    request.put(`/usage/admin/users/${user_id}/role`, { role }),
+}
+
+export const platformsApi = {
+  getList: () => request.get('/platforms'),
+  getDetail: (code: string) => request.get(`/platforms/${code}`),
+  create: (data: any) => request.post('/platforms', data),
+  update: (code: string, data: any) => request.put(`/platforms/${code}`, data),
+  delete: (code: string) => request.delete(`/platforms/${code}`),
+  toggle: (code: string) => request.post(`/platforms/${code}/toggle`),
+  test: (data: any) => request.post('/platforms/test', data),
+  reload: () => request.post('/platforms/reload'),
+}
+
 export default request
+
+
+
+
+
 
 

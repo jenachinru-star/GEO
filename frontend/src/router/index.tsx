@@ -23,6 +23,8 @@ const AssetDetail = lazy(() => import('@/pages/AssetDetail'))
 const PublishedList = lazy(() => import('@/pages/PublishedList'))
 const PublishAccounts = lazy(() => import('@/pages/PublishAccounts'))
 const UsageDashboard = lazy(() => import('@/pages/UsageDashboard'))
+const UsageGovernance = lazy(() => import('@/pages/UsageGovernance'))
+const AccountSettings = lazy(() => import('@/pages/AccountSettings'))
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAppStore()
@@ -57,6 +59,8 @@ const AppRouter = () => {
           <Route path="publish-accounts" element={<RequireAuth><PublishAccounts /></RequireAuth>} />
           <Route path="published" element={<RequireAuth><PublishedList /></RequireAuth>} />
           <Route path="usage" element={<RequireAuth><UsageDashboard /></RequireAuth>} />
+          <Route path="usage-governance" element={<RequireAuth><UsageGovernance /></RequireAuth>} />
+          <Route path="account" element={<RequireAuth><AccountSettings /></RequireAuth>} />
         </Route>
       </Routes>
     </Suspense>
@@ -64,3 +68,4 @@ const AppRouter = () => {
 }
 
 export default AppRouter
+

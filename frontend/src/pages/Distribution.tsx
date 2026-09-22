@@ -91,7 +91,7 @@ const Distribution = () => {
       message.success(`状态已更新为「${STATUS_CONFIG[status]?.label}」`)
       loadList()
     } catch (e: any) {
-      message.error(e.response?.data?.detail || '状态更新失败')
+      message.error('状态更新失败，请稍后重试')
     }
   }
 
@@ -463,4 +463,5 @@ const Distribution = () => {
 }
 
 export default Distribution
+
 

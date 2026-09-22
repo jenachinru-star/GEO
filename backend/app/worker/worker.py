@@ -91,18 +91,34 @@ def signal_handler(signum, frame):
 
 
 def claim_next_task(db: Session) -> AsyncTask | None:
-    """认领下一个 queued 任务（先到先得，单Worker模式下直接取第一个）"""
+    """认领下一个 queued 任务（原子UPDATE，多线程安全）"""
+    # 先查候选任务
     task = db.query(AsyncTask).filter(
         AsyncTask.status == "queued"
     ).order_by(AsyncTask.created_at.asc()).first()
 
-    if task:
-        task.status = "running"
-        task.started_at = datetime.now()
-        task.progress_message = "任务开始执行"
-        db.commit()
-        db.refresh(task)
-        logger.info(f"认领任务 #{task.id} (type={task.task_type})")
+    if not task:
+        return None
+
+    # 用原子UPDATE认领：只有status仍是queued时才更新成功
+    from sqlalchemy import update as sa_update
+    result = db.execute(
+        sa_update(AsyncTask)
+        .where(AsyncTask.id == task.id, AsyncTask.status == "queued")
+        .values(
+            status="running",
+            started_at=datetime.now(),
+            progress_message="任务开始执行",
+        )
+    )
+    db.commit()
+
+    if result.rowcount == 0:
+        # 被其他线程认领了
+        return None
+
+    db.refresh(task)
+    logger.info(f"认领任务 #{task.id} (type={task.task_type})")
     return task
 
 
@@ -112,8 +128,21 @@ def execute_task(db: Session, task: AsyncTask, on_progress: ProgressCallback = N
     if not handler:
         raise ValueError(f"未注册的任务类型: {task.task_type}，已注册类型: {get_all_task_types()}")
 
-    result = handler(db, task, on_progress)
-    return result
+    # 设置 usage_context，让 adapter 层能记录用量和检查配额
+    from app.usage_context import usage_context
+    ctx_token = usage_context.set(
+        user_id=task.created_by,
+        task_type=task.task_type,
+        ref_id=task.id,
+        ref_type="async_task",
+        source="worker",
+    )
+
+    try:
+        result = handler(db, task, on_progress)
+        return result
+    finally:
+        usage_context.reset(ctx_token)
 
 
 def complete_task(db: Session, task: AsyncTask, result: dict = None, error: str = None):

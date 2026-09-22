@@ -17,7 +17,8 @@ import {
   LoginOutlined,
   LogoutOutlined,
   AppstoreOutlined,
-  SendOutlined
+  SendOutlined,
+  SafetyCertificateOutlined
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store/useStore'
@@ -25,51 +26,47 @@ import { authApi } from '@/api'
 
 const { Header, Sider, Content } = Layout
 
-const menuItems = [
+const getAllMenuItems = () => [
   { key: '/dashboard', icon: <DashboardOutlined />, label: '数据概览' },
+  { key: '/data', icon: <MonitorOutlined />, label: '数据中心' },
+  { key: '/semantic', icon: <FileTextOutlined />, label: '语义库' },
+  { key: '/content', icon: <AppstoreOutlined />, label: '内容中心' },
   {
-    key: 'monitor-group',
-    icon: <MonitorOutlined />,
-    label: 'AI监测',
+    key: 'publish-group',
+    icon: <SendOutlined />,
+    label: '发布中心',
     children: [
-      { key: '/monitor', label: 'AI监测' },
-      { key: '/competitor', label: '竞品监测' },
-      { key: '/semantic', label: '语义库' },
-    ]
-  },
-  {
-    key: 'content-group',
-    icon: <AppstoreOutlined />,
-    label: '内容运营',
-    children: [
-      { key: '/content', label: '内容中心' },
-      { key: '/knowledge', label: '企业知识库' },
       { key: '/distribution', label: '发布管理' },
       { key: '/publish-accounts', label: '发布账号' },
       { key: '/published', label: '已发布列表' },
-    ]
+    ],
   },
-  {
-    key: 'asset-group',
-    icon: <BookOutlined />,
-    label: '数字资产',
-    children: [
-      { key: '/asset', label: '资产库' },
-      { key: '/rag', label: '智能问答' },
-    ]
-  },
-  {
-    key: 'system-group',
-    icon: <SettingOutlined />,
-    label: '系统管理',
-    children: [
-      { key: '/data', label: '数据中心' },
-      { key: '/usage', label: '用量统计' },
-      { key: '/tasks', label: '任务中心' },
-      { key: '/settings', label: '系统设置' },
-    ]
-  },
+  { key: '/asset', icon: <BookOutlined />, label: '数字资产' },
+  { key: '/tasks', icon: <SyncOutlined />, label: '任务中心' },
+  { key: '/usage', icon: <RobotOutlined />, label: '用量统计' },
+  { key: '/usage-governance', icon: <SafetyCertificateOutlined />, label: '用量管理' },
+  { key: '/settings', icon: <SettingOutlined />, label: '系统设置' },
 ]
+
+// 根据用户角色过滤菜单
+const filterMenuByRole = (items: any[], role: string) => {
+  if (role === "admin") {
+    return items
+  }
+  // 普通用户隐藏：用量统计（/usage）、系统设置（/settings）
+  const hiddenKeys = ['/usage', '/settings']
+  return items
+    .map(item => {
+      if (item.children) {
+        return {
+          ...item,
+          children: item.children.filter((child: any) => !hiddenKeys.includes(child.key))
+        }
+      }
+      return item
+    })
+    .filter(item => !hiddenKeys.includes(item.key))
+}
 
 const MainLayout = () => {
   const [collapsed, setCollapsed] = useState(false)
@@ -78,6 +75,8 @@ const MainLayout = () => {
   const { systemInfo, user, clearAuth } = useAppStore()
 
   const selectedKey = location.pathname
+  const userRole = user?.role || 'doctor'
+  const menuItems = filterMenuByRole(getAllMenuItems(), userRole)
 
   const handleMenuClick = ({ key }: { key: string }) => {
     navigate(key)
@@ -196,8 +195,9 @@ const MainLayout = () => {
             {user ? (
               <Dropdown menu={{
                 items: [
-                  { key: 'profile', icon: <UserOutlined />, label: '个人资料', onClick: () => navigate('/profile') },
-                  { key: 'settings', icon: <SettingOutlined />, label: '账号设置', onClick: () => navigate('/settings') },
+                  { key: 'account', icon: <UserOutlined />, label: '账号设置', onClick: () => navigate('/account') },
+                  { key: 'profile', icon: <UserOutlined />, label: '医生资料', onClick: () => navigate('/profile') },
+
                   { type: 'divider' },
                   { key: 'logout', icon: <LogoutOutlined />, label: '退出登录', onClick: handleLogout }
                 ]
@@ -229,4 +229,15 @@ const MainLayout = () => {
 }
 
 export default MainLayout
+
+
+
+
+
+
+
+
+
+
+
 

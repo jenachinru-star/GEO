@@ -9,6 +9,7 @@
 import json
 import logging
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.models.task import AsyncTask
 from app.models.asset import AssetSource, AssetDocument, AssetChunk
 from app.engines.asset_collector import asset_collector
@@ -179,15 +180,31 @@ def handle_asset_url_collect(db: Session, task: AsyncTask, on_progress: Progress
         if on_progress:
             on_progress(3, 5, "保存解析结果")
 
+        # 版本管理：把旧的当前版本设为历史版本，计算新版本号
+        old_docs = db.query(AssetDocument).filter(
+            AssetDocument.source_id == source.id,
+            AssetDocument.is_current == True,
+        ).all()
+        max_version = db.query(func.max(AssetDocument.version)).filter(
+            AssetDocument.source_id == source.id,
+        ).scalar() or 0
+        new_version = max_version + 1
+
+        for old_doc in old_docs:
+            old_doc.is_current = False
+        if old_docs:
+            logger.info(f"覆盖采集: source_id={source.id}, 旧版本{len(old_docs)}个设为历史, 新版本号={new_version}")
+
         doc = AssetDocument(
             source_id=source.id,
             user_id=source.user_id,
+            is_current=True,
+            version=new_version,
             title=result["title"],
             content=result["content"],
             author=result["author"],
             publish_date=result["publish_date"],
             word_count=len(result["content"]),
-            source_site=result.get("source_site", source.source_site),
         )
         db.add(doc)
 
@@ -211,6 +228,7 @@ def handle_asset_url_collect(db: Session, task: AsyncTask, on_progress: Progress
         return {"source_id": source_id, "document_id": doc.id, "word_count": len(result["content"])}
 
     except Exception as e:
+        db.rollback()
         source.status = "failed"
         source.error_message = str(e)[:500]
         db.commit()
@@ -254,9 +272,23 @@ def handle_asset_file_parse(db: Session, task: AsyncTask, on_progress: ProgressC
         if on_progress:
             on_progress(3, 5, "保存解析结果")
 
+        # 版本管理：旧版本设为历史，计算新版本号
+        old_docs = db.query(AssetDocument).filter(
+            AssetDocument.source_id == source.id,
+            AssetDocument.is_current == True,
+        ).all()
+        max_version = db.query(func.max(AssetDocument.version)).filter(
+            AssetDocument.source_id == source.id,
+        ).scalar() or 0
+        new_version = max_version + 1
+        for old_doc in old_docs:
+            old_doc.is_current = False
+
         doc = AssetDocument(
             source_id=source.id,
             user_id=source.user_id,
+            is_current=True,
+            version=new_version,
             title=result["title"],
             content=result["content"],
             word_count=len(result["content"]),

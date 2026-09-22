@@ -82,7 +82,7 @@ const Monitor = () => {
         return
       }
       // /monitor/collect 是异步任务：POST 只返回 task_id，采集在 worker 后台执行
-      message.loading({ content: `采集任务 #${taskId} 已提交，正在后台执行...`, key: loadingKey, duration: 0 })
+      message.success({ content: `数据采集已开始，可在任务中心查看进度`, key: loadingKey, duration: 3 })
 
       let pollCount = 0
       const maxPolls = 600

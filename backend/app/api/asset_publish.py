@@ -10,6 +10,7 @@ import logging
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import Optional
 from pydantic import BaseModel
 
@@ -145,6 +146,39 @@ def publish_from_document(
 
 
 # ============ 发布内容CRUD ============
+
+@router.get("/stats/overview", summary="获取发布内容统计概览")
+def stats_overview(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """获取当前用户的发布内容统计：总数、已发布、草稿、总浏览量、总引用数"""
+    base_query = db.query(AssetPublished).filter(AssetPublished.user_id == user_id)
+
+    total = base_query.count()
+    published = base_query.filter(AssetPublished.status == "published").count()
+    draft = base_query.filter(AssetPublished.status == "draft").count()
+
+    view_sum = db.query(func.coalesce(func.sum(AssetPublished.view_count), 0)).filter(
+        AssetPublished.user_id == user_id
+    ).scalar() or 0
+    citation_sum = db.query(func.coalesce(func.sum(AssetPublished.citation_count), 0)).filter(
+        AssetPublished.user_id == user_id
+    ).scalar() or 0
+
+    return {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "total": total,
+            "published": published,
+            "draft": draft,
+            "archived": base_query.filter(AssetPublished.status == "archived").count(),
+            "total_views": int(view_sum),
+            "total_citations": int(citation_sum),
+        }
+    }
+
 
 @router.get("/list", summary="获取我的发布内容列表")
 def list_published(
@@ -296,3 +330,4 @@ def delete_published(
     db.delete(p)
     db.commit()
     return {"code": 0, "message": "success"}
+

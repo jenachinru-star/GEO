@@ -1,7 +1,7 @@
 ﻿import { useState, useEffect, useRef } from 'react'
 import { formatUtcTime } from '@/utils/time'
-import { Card, Button, Space, Typography, Tag, Spin, message, Tabs, Divider, Select, Input, Avatar, List, Popconfirm } from 'antd'
-import { ArrowLeftOutlined, RobotOutlined, SendOutlined, UserOutlined, ThunderboltOutlined, PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, DiffOutlined } from '@ant-design/icons'
+import { Card, Button, Space, Typography, Tag, Spin, message, Tabs, Divider, Select, Input, Avatar, List, Popconfirm, Dropdown } from 'antd'
+import { ArrowLeftOutlined, RobotOutlined, SendOutlined, UserOutlined, ThunderboltOutlined, PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, DiffOutlined, DownloadOutlined, SyncOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { assetApi } from '@/api/asset'
 import MindmapViewer from '@/components/MindmapViewer'
@@ -54,6 +54,7 @@ const AssetDetail = () => {
   const [compareMode, setCompareMode] = useState(false)
   const [compareModels, setCompareModels] = useState<string[]>([])
   const [compareResults, setCompareResults] = useState<any[]>([])
+  const [refreshLoading, setRefreshLoading] = useState(false)
 
   const fetchDetail = async () => {
     setLoading(true)
@@ -198,6 +199,54 @@ const AssetDetail = () => {
     }
   }
 
+  const handleRefreshContent = () => {
+    if (!detail?.url) {
+      message.warning('该资产没有URL，无法重新采集')
+      return
+    }
+    Modal.confirm({
+      title: '重新采集',
+      content: '将重新采集该URL的最新内容，旧版本将保留为历史版本。确定继续？',
+      okText: '重新采集',
+      cancelText: '取消',
+      onOk: async () => {
+        setRefreshLoading(true)
+        try {
+          const res: any = await assetApi.createSource({
+            source_type: 'url',
+            url: detail.url,
+            force_refresh: true,
+          })
+          message.success(res.message || '已重新提交采集，完成后内容将更新')
+          setTimeout(() => fetchDetail(), 3000)
+        } catch (e) {
+          message.error('重新采集失败')
+        } finally {
+          setRefreshLoading(false)
+        }
+      },
+    })
+  }
+
+  const handleDeleteAsset = () => {
+    Modal.confirm({
+      title: '确认删除',
+      content: '删除后该资产及其所有版本、笔记将被移除，已发布的内容不受影响。',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await assetApi.deleteSource(Number(id))
+          message.success('已删除')
+          navigate('/asset')
+        } catch (e) {
+          message.error('删除失败')
+        }
+      },
+    })
+  }
+
   const handleGenerateSummary = async () => {
     if (!detail?.document) {
       message.warning('文档尚未解析完成')
@@ -230,9 +279,13 @@ const AssetDetail = () => {
     setStreaming(true)
 
     try {
+      const token = localStorage.getItem('geo_token')
       const response = await fetch('/geo/api/v1/asset/chat/stream', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
         body: JSON.stringify({
           session_id: selectedSessionId,
           document_id: detail?.document?.id,
@@ -687,6 +740,20 @@ const AssetDetail = () => {
                   导出
                 </Button>
               </Dropdown>
+              <Button
+                icon={<SyncOutlined />}
+                loading={refreshLoading}
+                onClick={handleRefreshContent}
+              >
+                重新采集
+              </Button>
+              <Button
+                danger
+                icon={<DeleteOutlined />}
+                onClick={handleDeleteAsset}
+              >
+                删除
+              </Button>
             </Space>
           </Space>
         </div>

@@ -9,7 +9,7 @@ from app.schemas import *
 from app.services import MonitorService
 from app.models import Question
 from app.models.task import AsyncTask
-from app.models.workspace import WorkspaceMember
+from app.services.workspace_service import get_user_workspace_id
 
 router = APIRouter(prefix="/api/v1/monitor", tags=["监测中心"])
 
@@ -105,11 +105,7 @@ def get_trend(
 def trigger_collect(data: CollectRequest, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     """触发采集（异步，由Worker执行）"""
     # 获取用户默认 workspace_id
-    ws_member = db.query(WorkspaceMember).filter(
-        WorkspaceMember.user_id == user_id,
-        WorkspaceMember.role == "owner"
-    ).first()
-    workspace_id = ws_member.workspace_id if ws_member else None
+    workspace_id = get_user_workspace_id(db, user_id)
 
     # 检查是否已有 running 的同类型任务（防止重复提交）
     running_task = db.query(AsyncTask).filter(

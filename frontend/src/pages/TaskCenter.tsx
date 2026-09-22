@@ -55,7 +55,7 @@ const TaskCenter = () => {
   useEffect(() => {
     const hasActive = tasks.some(t => t.status === 'running' || t.status === 'queued')
     if (!hasActive) return
-    const timer = setInterval(fetchTasks, 3000)
+    const timer = setInterval(fetchTasks, 10000)
     return () => clearInterval(timer)
   }, [tasks, fetchTasks])
 
@@ -71,16 +71,15 @@ const TaskCenter = () => {
 
   const columns = [
     {
-      title: '任务ID',
-      dataIndex: 'id',
-      width: 80,
-      render: (id: number) => <span style={{ fontFamily: 'monospace' }}>#{id}</span>,
-    },
-    {
-      title: '任务类型',
+      title: '任务',
       dataIndex: 'task_type',
-      width: 140,
-      render: (type: string) => TASK_TYPE_NAMES[type] || type,
+      width: 200,
+      render: (type: string, record: any) => (
+        <div>
+          <div>{TASK_TYPE_NAMES[type] || type}</div>
+          <div style={{ fontSize: 12, color: '#94a3b8' }}>{record.created_at?.slice(5, 16)}</div>
+        </div>
+      ),
     },
     {
       title: '状态',

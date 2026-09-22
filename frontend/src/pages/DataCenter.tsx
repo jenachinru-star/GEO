@@ -64,10 +64,10 @@ const DataCenter = () => {
       }
       // 后端是异步任务：POST 只返回 task_id，真正的采集在 worker 后台执行
       // 这里只提示"已提交"，然后轮询任务状态，等任务真正完成后再报结果
-      message.loading({ content: `采集任务 #${taskId} 已提交，正在后台执行...`, key: loadingKey, duration: 0 })
+      message.success({ content: `数据采集已开始，可在任务中心查看进度`, key: loadingKey, duration: 3 })
 
       let pollCount = 0
-      const maxPolls = 600 // 3秒一次 × 600次 = 30分钟上限
+      const maxPolls = 300 // 10秒一次 × 300次 = 50分钟上限
       pollTimerRef.current = setInterval(async () => {
         pollCount++
         try {
@@ -92,7 +92,7 @@ const DataCenter = () => {
         } catch (e) {
           // 单次查询失败不中断，继续轮询
         }
-      }, 3000)
+      }, 10000)
     } catch (e: any) {
       message.error({ content: e?.response?.data?.detail || '采集失败', key: loadingKey })
       setRefreshing(false)

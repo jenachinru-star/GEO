@@ -136,8 +136,17 @@ def get_available_models(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    """返回当前系统已配置的所有AI模型"""
+    """返回当前用户可用的AI模型（管理员配置 AND 用户个人开关）"""
     enabled = adapter_factory.get_enabled_platforms()
+
+    # 过滤用户已停用的平台
+    from app.models.user_platform_pref import UserPlatformPref
+    user_prefs = db.query(UserPlatformPref).filter(
+        UserPlatformPref.user_id == user_id,
+        UserPlatformPref.enabled == False,
+    ).all()
+    disabled_codes = {p.platform_code for p in user_prefs}
+    enabled = [p for p in enabled if p not in disabled_codes]
 
     # 模型元信息
     model_info = {
@@ -489,8 +498,8 @@ def send_message(
             content=result.answer,
             platform=req.platform,
             model=getattr(adapter, 'model', ''),
-            tokens_input=result.tokens_input or 0,
-            tokens_output=result.tokens_output or 0,
+            tokens_input=result.prompt_tokens or 0,
+            tokens_output=result.completion_tokens or 0,
             sources=json.dumps(sources, ensure_ascii=False),
         )
         db.add(assistant_msg)
@@ -621,8 +630,8 @@ def compare_models(
                     "success": True,
                     "content": result.answer,
                     "model": getattr(adapter, 'model', ''),
-                    "tokens_input": result.tokens_input or 0,
-                    "tokens_output": result.tokens_output or 0,
+                    "tokens_input": result.prompt_tokens or 0,
+                    "tokens_output": result.completion_tokens or 0,
                 })
             else:
                 results.append({
@@ -753,6 +762,16 @@ def chat_stream(
         full_answer = ""
         tokens_input = 0
         tokens_output = 0
+
+        # 设置用量上下文（必须在adapter调用前）
+        from app.usage_context import usage_context
+        ctx_token = usage_context.set(
+            user_id=user_id,
+            task_type="asset_chat",
+            ref_id=session.id,
+            ref_type="chat_session",
+            source="http"
+        )
 
         try:
             # 先发送元数据（会话ID + 引用来源）

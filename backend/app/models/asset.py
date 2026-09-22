@@ -59,8 +59,12 @@ class AssetDocument(Base):
     __tablename__ = "geo_asset_document"
 
     id = Column(Integer, primary_key=True, index=True)
-    source_id = Column(Integer, ForeignKey("geo_asset_source.id"), nullable=False, unique=True)
+    source_id = Column(Integer, ForeignKey("geo_asset_source.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("geo_user.id"), nullable=False, index=True)
+
+    # 版本管理
+    is_current = Column(Boolean, default=True, index=True)  # 是否当前版本
+    version = Column(Integer, default=1)  # 版本号，从1开始递增
 
     # 文档内容
     title = Column(String(500), default="", index=True)
@@ -275,3 +279,24 @@ class AssetFolder(Base):
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class AssetTag(Base):
+    """用户自定义标签"""
+    __tablename__ = "geo_asset_tag"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("geo_user.id"), nullable=False, index=True)
+    name = Column(String(50), nullable=False)
+    color = Column(String(20), default="blue")
+    sort_order = Column(Integer, default=0)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class AssetSourceTag(Base):
+    """资产源-标签关联表"""
+    __tablename__ = "geo_asset_source_tag"
+
+    id = Column(Integer, primary_key=True, index=True)
+    source_id = Column(Integer, ForeignKey("geo_asset_source.id"), nullable=False, index=True)
+    tag_id = Column(Integer, ForeignKey("geo_asset_tag.id"), nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

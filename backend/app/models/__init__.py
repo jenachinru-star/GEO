@@ -32,6 +32,10 @@ from app.models.asset import (
 # ===== 发布模块 =====
 from app.models.publish_account import PublishAccount
 
+# ===== 用量治理模块 =====
+from app.models.user_platform_pref import UserPlatformPref
+from app.models.user_quota import UserQuota
+
 __all__ = [
     "Platform",
     "Question",
@@ -62,4 +66,7 @@ __all__ = [
     "AssetFolder",
     # 发布模块
     "PublishAccount",
+    # 用量治理模块
+    "UserPlatformPref",
+    "UserQuota",
 ]

@@ -103,6 +103,7 @@ def _fallback_document_search(db: Session, user_id: int, q: str, top_k: int) -> 
 
     docs = db.query(AssetDocument).filter(
         AssetDocument.user_id == user_id,
+        AssetDocument.is_current == True,
         AssetDocument.content != ""
     ).all()
 

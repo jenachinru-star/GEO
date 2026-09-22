@@ -108,6 +108,10 @@ class IAMService:
             self.db.refresh(user)
             logger.info(f"IAM自动创建用户: {username}")
 
+            # 自动创建个人工作空间
+            from app.services.workspace_service import ensure_user_workspace
+            ensure_user_workspace(self.db, user.id, username)
+
         return user
 
     def generate_jwt(self, user: User) -> str:

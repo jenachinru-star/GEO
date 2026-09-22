@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useRef } from 'react'
-import { Card, Input, Button, Space, Typography, Tag, Empty, Spin, Pagination, Modal, Form, Upload, message, Tabs, Divider, Layout, Tree } from 'antd'
+import { Card, Input, Button, Space, Typography, Tag, Empty, Spin, Pagination, Modal, Form, Upload, message, Tabs, Divider, Layout, Tree, Popconfirm } from 'antd'
 import { PlusOutlined, SearchOutlined, LinkOutlined, FileTextOutlined, BookOutlined, UploadOutlined, LoadingOutlined, FolderOutlined, StarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { assetApi } from '@/api/asset'
@@ -109,16 +109,32 @@ const AssetHub = () => {
     setModalTab('url')
   }
 
-  const handleSubmitUrl = async () => {
+  const handleSubmitUrl = async (forceRefresh = false) => {
     try {
       const values = await urlForm.validateFields()
       setSubmitting(true)
-      await assetApi.createSource({
+      const res: any = await assetApi.createSource({
         source_type: 'url',
         url: values.url,
         title: values.title || '',
+        force_refresh: forceRefresh,
       })
-      message.success('已提交，正在后台采集网页内容')
+      if (res.code === 1) {
+        // 已采集完成，弹确认框
+        Modal.confirm({
+          title: '该URL已采集',
+          content: res.message,
+          okText: '重新采集',
+          cancelText: '取消',
+          onOk: () => handleSubmitUrl(true),
+        })
+        return
+      }
+      if (res.code === 2) {
+        message.warning(res.message)
+        return
+      }
+      message.success(res.message || '已提交，正在后台采集网页内容')
       setModalOpen(false)
       urlForm.resetFields()
       fetchData()
@@ -126,6 +142,41 @@ const AssetHub = () => {
       // 错误已在拦截器提示
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleDelete = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    Modal.confirm({
+      title: '确认删除',
+      content: '删除后该资产及其所有版本、笔记将被移除，已发布的内容不受影响。',
+      okText: '删除',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: async () => {
+        try {
+          await assetApi.deleteSource(id)
+          message.success('已删除')
+          fetchData()
+        } catch (e) {
+          message.error('删除失败')
+        }
+      },
+    })
+  }
+
+  const handleRetry = async (id: number, url: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      const res: any = await assetApi.createSource({
+        source_type: 'url',
+        url: url,
+        force_refresh: true,
+      })
+      message.success(res.message || '已重新提交采集')
+      fetchData()
+    } catch (e) {
+      message.error('重试失败')
     }
   }
 
@@ -371,9 +422,19 @@ const AssetHub = () => {
                       <Text type="secondary" style={{ fontSize: 12 }}>
                         {item.updated_at ? formatUtcDate(item.updated_at) : ''}
                       </Text>
-                      <Tag color={item.status === 'completed' ? 'green' : item.status === 'failed' ? 'red' : 'orange'}>
-                        {item.status}
-                      </Tag>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {item.status === 'failed' && (
+                          <Button type="link" size="small" style={{ padding: 0, fontSize: 12 }} onClick={(e) => handleRetry(item.id, item.url, e)}>
+                            重试
+                          </Button>
+                        )}
+                        <Button type="link" size="small" danger style={{ padding: 0, fontSize: 12 }} onClick={(e) => handleDelete(item.id, e)}>
+                          删除
+                        </Button>
+                        <Tag color={item.status === 'completed' ? 'green' : item.status === 'failed' ? 'red' : 'orange'}>
+                          {item.status}
+                        </Tag>
+                      </div>
                     </div>
                   </Card>
                 ))}
@@ -426,7 +487,7 @@ const AssetHub = () => {
                       type="primary"
                       block
                       loading={submitting}
-                      onClick={handleSubmitUrl}
+                      onClick={() => handleSubmitUrl()}
                       style={{ marginTop: 8 }}
                     >
                       收藏并自动解析

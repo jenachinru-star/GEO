@@ -1,4 +1,4 @@
-"""本地账号认证 API — 邮箱注册/登录（对外用户）
+﻿"""本地账号认证 API — 邮箱注册/登录（对外用户）
 
 与 IAM 企业登录并存：
 - 本地账号：面向对外医生用户，邮箱注册 + 密码登录
@@ -60,7 +60,7 @@ class RegisterRequest(BaseModel):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str  # 支持邮箱或用户名
     password: str
 
 
@@ -287,6 +287,10 @@ def register(
     db.commit()
     db.refresh(user)
 
+    # 自动创建个人工作空间
+    from app.services.workspace_service import ensure_user_workspace
+    ensure_user_workspace(db, user.id, username)
+
     # 注册成功后自动登录，返回 JWT
     token = _generate_jwt(user)
 
@@ -315,30 +319,33 @@ def login(
     req: LoginRequest,
     db: Session = Depends(get_db),
 ):
-    """用户登录"""
-    email = str(req.email).strip().lower()
+    """用户登录（支持邮箱或用户名）"""
+    identifier = str(req.email).strip()
     password = req.password
+    email_lower = identifier.lower()
 
     # 检查登录锁定
-    _check_login_lock(email)
+    _check_login_lock(email_lower)
 
-    # 查找用户
-    user = db.query(User).filter(User.email == email).first()
+    # 查找用户：先按邮箱查，再按用户名查
+    user = db.query(User).filter(
+        (User.email == email_lower) | (User.username == identifier)
+    ).first()
     if not user:
-        _record_login_failure(email)
-        raise HTTPException(status_code=401, detail="邮箱或密码错误")
+        _record_login_failure(email_lower)
+        raise HTTPException(status_code=401, detail="账号或密码错误")
 
     if not user.status:
         raise HTTPException(status_code=403, detail="账号已被禁用")
 
     # 验证密码（IAM 用户 password_hash 为空，不能用本地登录）
     if not user.password_hash:
-        _record_login_failure(email)
+        _record_login_failure(email_lower)
         raise HTTPException(status_code=401, detail="该账号为企业账号，请使用企业登录")
 
     if not _verify_password(password, user.password_hash):
-        _record_login_failure(email)
-        raise HTTPException(status_code=401, detail="邮箱或密码错误")
+        _record_login_failure(email_lower)
+        raise HTTPException(status_code=401, detail="账号或密码错误")
 
     # 登录成功，更新登录信息
     user.last_login_at = datetime.now()
@@ -346,12 +353,12 @@ def login(
     db.commit()
 
     # 清除登录失败记录
-    _clear_login_failures(email)
+    _clear_login_failures(email_lower)
 
     # 生成 JWT
     token = _generate_jwt(user)
 
-    logger.info(f"用户登录成功: email={email}, user_id={user.id}")
+    logger.info(f"用户登录成功: identifier={identifier}, user_id={user.id}")
 
     return {
         "code": 0,
@@ -430,3 +437,63 @@ def change_password(
     logger.info(f"用户修改密码成功: user_id={user_id}")
 
     return {"code": 0, "message": "success"}
+
+
+# ============ 用户资料管理 ============
+
+class ProfileUpdateRequest(BaseModel):
+    username: str = Field(..., min_length=2, max_length=50)
+    avatar: str = Field("", max_length=500)
+
+
+@router.get("/profile", summary="获取当前用户资料")
+def get_profile(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """获取当前登录用户的资料"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    return {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "avatar": user.avatar or "",
+            "role": user.role,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+        }
+    }
+
+
+@router.put("/profile", summary="更新当前用户资料")
+def update_profile(
+    req: ProfileUpdateRequest,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """更新当前登录用户的资料（用户名、头像）"""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    
+    user.username = req.username
+    if req.avatar is not None:
+        user.avatar = req.avatar
+    
+    db.commit()
+    
+    return {
+        "code": 0,
+        "message": "success",
+        "data": {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "avatar": user.avatar or "",
+        }
+    }

@@ -40,6 +40,7 @@ class AssetCreateRequest(BaseModel):
     content: str = ""  # clipboard/manual类型时直接传内容
     category: str = ""
     tags: str = ""
+    force_refresh: bool = False  # 强制重新采集（覆盖已有版本）
 
 
 class AssetUpdateRequest(BaseModel):
@@ -144,8 +145,80 @@ def create_source(
 ):
     """创建新的资产源（收藏URL/手动添加内容）
 
-    URL类型会自动触发异步采集任务
+    URL类型会自动触发异步采集任务。
+    重复URL检测：已采集完成时提示是否覆盖；正在采集中时提示稍候；
+    采集失败时自动重试；force_refresh=true时强制覆盖采集。
     """
+    # URL类型：先检测重复
+    if req.source_type == "url" and req.url:
+        existing = db.query(AssetSource).filter(
+            AssetSource.user_id == user_id,
+            AssetSource.url == req.url,
+        ).first()
+
+        if existing:
+            # 正在采集或等待中
+            if existing.status in ("pending", "processing"):
+                return {
+                    "code": 2,
+                    "message": "该URL正在采集中，请稍候",
+                    "data": {"source_id": existing.id, "status": existing.status},
+                }
+
+            # 采集失败：检查是否有当前版本文档
+            if existing.status == "failed":
+                has_doc = db.query(AssetDocument).filter(
+                    AssetDocument.source_id == existing.id,
+                    AssetDocument.is_current == True,
+                ).first()
+                if not has_doc:
+                    # 真失败，直接重试
+                    existing.status = "pending"
+                    existing.error_message = ""
+                    db.commit()
+                    task = AsyncTask(
+                        task_type="asset_url_collect",
+                        status="queued",
+                        progress=0,
+                        progress_message="等待采集",
+                        payload_json=json.dumps({"source_id": existing.id}, ensure_ascii=False),
+                        created_by=user_id,
+                    )
+                    db.add(task)
+                    db.commit()
+                    db.refresh(task)
+                    logger.info(f"失败重试URL采集: source_id={existing.id}, task_id={task.id}")
+                    return {"code": 0, "message": "上次采集失败，已重新提交", "data": {"id": existing.id, "task_id": task.id}}
+                # 有文档（假失败场景），按completed处理
+
+            # 已采集完成（或假失败）：未强制刷新时提示
+            if existing.status == "completed" or (existing.status == "failed" and not req.force_refresh):
+                if not req.force_refresh:
+                    return {
+                        "code": 1,
+                        "message": f"该URL已于{existing.created_at.strftime('%Y-%m-%d %H:%M')}采集完成，是否重新采集覆盖？",
+                        "data": {"source_id": existing.id, "collected_at": existing.created_at.isoformat()},
+                    }
+
+            # force_refresh=true：覆盖采集，重置状态，创建新任务
+            existing.status = "pending"
+            existing.error_message = ""
+            db.commit()
+            task = AsyncTask(
+                task_type="asset_url_collect",
+                status="queued",
+                progress=0,
+                progress_message="等待采集",
+                payload_json=json.dumps({"source_id": existing.id}, ensure_ascii=False),
+                created_by=user_id,
+            )
+            db.add(task)
+            db.commit()
+            db.refresh(task)
+            logger.info(f"覆盖采集URL: source_id={existing.id}, task_id={task.id}")
+            return {"code": 0, "message": "正在重新采集，完成后内容将更新", "data": {"id": existing.id, "task_id": task.id}}
+
+    # 不存在重复，正常创建
     source = AssetSource(
         user_id=user_id,
         source_type=req.source_type,
@@ -165,6 +238,8 @@ def create_source(
         doc = AssetDocument(
             source_id=source.id,
             user_id=user_id,
+            is_current=True,
+            version=1,
             title=req.title or "未命名文档",
             content=req.content,
             word_count=len(req.content),
@@ -286,7 +361,7 @@ def get_source_detail(
     }
 
     # 获取文档
-    doc = db.query(AssetDocument).filter(AssetDocument.source_id == source_id).first()
+    doc = db.query(AssetDocument).filter(AssetDocument.source_id == source_id, AssetDocument.is_current == True).first()
     if doc:
         result["document"] = {
             "id": doc.id,
@@ -366,7 +441,7 @@ def delete_source(
             pass
 
     # 级联删除文档及其关联
-    doc = db.query(AssetDocument).filter(AssetDocument.source_id == source_id).first()
+    doc = db.query(AssetDocument).filter(AssetDocument.source_id == source_id, AssetDocument.is_current == True).first()
     if doc:
         db.delete(doc)
     db.delete(source)

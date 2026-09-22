@@ -129,11 +129,8 @@ class OpportunityEngine:
         doctor_id = profile.id if profile else None
 
         # 获取 workspace_id
-        from app.models.workspace import WorkspaceMember
-        ws = self.db.query(WorkspaceMember).filter(
-            WorkspaceMember.user_id == user_id, WorkspaceMember.role == "owner"
-        ).first()
-        workspace_id = ws.workspace_id if ws else None
+        from app.services.workspace_service import get_user_workspace_id
+        workspace_id = get_user_workspace_id(self.db, user_id)
 
         opp = ContentOpportunity(
             workspace_id=workspace_id,

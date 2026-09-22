@@ -270,9 +270,11 @@ def recollect_distribution(
 
     # 创建异步采集任务（复用 monitor_collect）
     from app.models.task import AsyncTask
+    from app.services.workspace_service import get_user_workspace_id
     import json
+    workspace_id = get_user_workspace_id(db, user_id)
     task = AsyncTask(
-        workspace_id=None,
+        workspace_id=workspace_id,
         task_type="monitor_collect",
         status="queued",
         progress=0,

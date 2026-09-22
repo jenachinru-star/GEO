@@ -1,7 +1,7 @@
 """数字资产 - Embedding 向量引擎
 
-调用GLM embedding API生成文本向量，用于语义检索。
-降级方案：如果API调用失败，自动回退到纯Python n-gram向量。
+使用本地n-gram向量（纯Python实现，零依赖、零费用）。
+之前使用GLM embedding API，但代理不支持/embeddings接口，已改为直接使用本地向量。
 """
 import json
 import logging
@@ -17,7 +17,7 @@ class AssetEmbedder:
 
     # GLM embedding模型名称
     EMBEDDING_MODEL = "embedding-3"  # GLM embedding模型
-    EMBEDDING_DIM = 2048  # GLM embedding-3 输出维度
+    EMBEDDING_DIM = 256  # 本地n-gram向量维度
 
     def __init__(self):
         self._client = None
@@ -43,27 +43,9 @@ class AssetEmbedder:
         return self._client
 
     def embed_text(self, text: str) -> List[float]:
-        """将文本转换为向量
-
-        优先使用GLM embedding API，失败时回退到纯Python n-gram向量
-        """
+        """将文本转换为向量（使用本地n-gram向量，零依赖、零费用）"""
         if not text or not text.strip():
             return [0.0] * self.EMBEDDING_DIM
-
-        # 尝试调用GLM embedding API
-        client = self._get_client()
-        if client:
-            try:
-                response = client.embeddings.create(
-                    model=self.EMBEDDING_MODEL,
-                    input=text[:8000],  # 截断超长文本
-                )
-                vec = response.data[0].embedding
-                return vec
-            except Exception as e:
-                logger.warning(f"GLM embedding API调用失败，回退到本地向量: {e}")
-
-        # 降级：使用纯Python向量
         return vector_engine.text_to_vector(text)
 
     def embed_texts(self, texts: List[str]) -> List[List[float]]:

@@ -41,9 +41,16 @@ from app.api import (
     asset_router,
     asset_summary_router,
     asset_search_router,
+    asset_publish_router,
+    asset_chat_router,
+    asset_export_router,
+    asset_folder_router,
+    asset_pubmed_router,
+    asset_tag_router,
     video_router,
     publish_account_router,
 )
+from app.api.usage_governance import router as usage_governance_router
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +96,7 @@ async def lifespan(app: FastAPI):
     usage_logger.start()
     print("📊 LLM 用量日志记录器已启动")
 
-    worker_thread = None
+    worker_threads = []
 
     if APP_ROLE == "api":
         # 启动定时任务（每天上午10点执行采集）
@@ -104,12 +111,14 @@ async def lifespan(app: FastAPI):
         scheduler.start()
         print("⏰ 定时任务已启动（每天10:00自动采集）")
 
-        # 自动启动内嵌 Worker 线程（开发/小型部署用，生产环境可设 AUTO_START_WORKER=false 单独部署Worker）
+        # 自动启动内嵌 Worker 线程（2个并发工作线程，开发/小型部署用）
         if AUTO_START_WORKER:
             from app.worker.worker import run_worker_loop
-            worker_thread = threading.Thread(target=run_worker_loop, daemon=True, name="geo-worker")
-            worker_thread.start()
-            print("🔄 内嵌 Worker 线程已启动（自动执行异步任务）")
+            for i in range(2):
+                t = threading.Thread(target=run_worker_loop, daemon=True, name=f"geo-worker-{i}")
+                t.start()
+                worker_threads.append(t)
+            print("🔄 内嵌 Worker 已启动（2个并发工作线程）")
         else:
             print("⏭️  AUTO_START_WORKER=false，不启动内嵌Worker（需单独启动Worker进程）")
     else:
@@ -120,10 +129,11 @@ async def lifespan(app: FastAPI):
     # 关闭时停止调度器和Worker
     if APP_ROLE == "api":
         scheduler.shutdown()
-        if AUTO_START_WORKER and worker_thread:
+        if AUTO_START_WORKER and worker_threads:
             from app.worker.worker import stop_worker_loop
             stop_worker_loop()
-            worker_thread.join(timeout=5)
+            for t in worker_threads:
+                t.join(timeout=5)
             print("🔄 内嵌 Worker 线程已停止")
     # 停止 LLM 用量日志记录器
     from app.usage_logger import usage_logger
@@ -182,10 +192,17 @@ mount_static_files(app)
 app.include_router(asset_router)
 app.include_router(asset_summary_router)
 app.include_router(asset_search_router)
+app.include_router(asset_publish_router)
+app.include_router(asset_chat_router)
+app.include_router(asset_export_router)
+app.include_router(asset_folder_router)
+app.include_router(asset_pubmed_router)
+app.include_router(asset_tag_router)
 
 # 新增模块路由
 app.include_router(video_router)
 app.include_router(publish_account_router)
+app.include_router(usage_governance_router)
 
 
 @app.get("/", summary="健康检查")
@@ -220,4 +237,8 @@ if __name__ == "__main__":
             port=settings.PORT,
             reload=settings.DEBUG
         )
+
+
+
+
 
