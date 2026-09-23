@@ -36,6 +36,9 @@ from app.models.publish_account import PublishAccount
 from app.models.user_platform_pref import UserPlatformPref
 from app.models.user_quota import UserQuota
 
+# ===== 微信公众号数据统计模块 =====
+from app.models.wechat_stats import WechatAccountStats, WechatArticle, WechatArticleStats
+
 __all__ = [
     "Platform",
     "Question",
@@ -69,4 +72,8 @@ __all__ = [
     # 用量治理模块
     "UserPlatformPref",
     "UserQuota",
+    # 微信公众号数据统计模块
+    "WechatAccountStats",
+    "WechatArticle",
+    "WechatArticleStats",
 ]

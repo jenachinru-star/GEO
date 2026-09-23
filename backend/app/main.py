@@ -118,6 +118,57 @@ def scheduled_collect():
         logger.error(f"❌ 定时采集任务异常: {e}")
 
 
+def scheduled_collect_wechat_data():
+    """定时采集微信公众号数据：每天凌晨2点自动采集所有已验证账号的前一天数据"""
+    try:
+        import json
+        from app.models.publish_account import PublishAccount
+        from app.models.task import AsyncTask
+
+        logger.info("⏰ 微信公众号数据定时采集开始")
+        db = SessionLocal()
+
+        # 查找所有已验证的微信公众号账号
+        accounts = db.query(PublishAccount).filter(
+            PublishAccount.platform == "wechat",
+            PublishAccount.login_status == "valid",
+            PublishAccount.app_id != "",
+        ).all()
+
+        task_count = 0
+        for account in accounts:
+            try:
+                # 检查是否已有running/queued的采集任务，避免重复投递
+                existing = db.query(AsyncTask).filter(
+                    AsyncTask.task_type == "wechat_data_collect",
+                    AsyncTask.status.in_(["queued", "running"]),
+                    AsyncTask.created_by == account.user_id,
+                ).first()
+                if existing:
+                    logger.info(f"账号 [{account.account_name}] 已有采集任务在执行，跳过")
+                    continue
+
+                task = AsyncTask(
+                    task_type="wechat_data_collect",
+                    status="queued",
+                    created_by=account.user_id,
+                    payload_json=json.dumps({"account_id": account.id, "days": 1}, ensure_ascii=False),
+                    progress_message=f"定时采集微信公众号数据 [{account.account_name}]",
+                )
+                db.add(task)
+                db.commit()
+                task_count += 1
+                logger.info(f"账号 [{account.account_name}] 数据采集任务已投递 #{task.id}")
+            except Exception as e:
+                logger.error(f"为账号 [{account.account_name}] 投递采集任务失败: {e}")
+                db.rollback()
+
+        db.close()
+        logger.info(f"✅ 微信公众号数据定时采集完成，共投递 {task_count} 个任务")
+    except Exception as e:
+        logger.error(f"❌ 微信公众号数据定时采集异常: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """应用生命周期：启动时初始化数据库和定时任务"""
@@ -152,8 +203,20 @@ async def lifespan(app: FastAPI):
             id='daily_collect',
             replace_existing=True
         )
+
+        # 微信公众号数据定时采集（每天凌晨2点）
+        scheduler.add_job(
+            scheduled_collect_wechat_data,
+            'cron',
+            hour=2,
+            minute=0,
+            id='daily_wechat_data_collect',
+            replace_existing=True
+        )
+
         scheduler.start()
         print("⏰ 定时任务已启动（每天10:00自动采集）")
+        print("⏰ 微信公众号数据定时采集已启动（每天02:00自动采集）")
 
         # 自动启动内嵌 Worker 线程（2个并发工作线程，开发/小型部署用）
         if AUTO_START_WORKER:

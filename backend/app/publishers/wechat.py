@@ -38,8 +38,49 @@ class WechatPublisher(BasePublisher):
             raise ValueError(f"获取access_token失败: {data}")
         return data["access_token"]
 
+    def _upload_image(self, access_token: str, image_url: str = "", image_data: bytes = None) -> str:
+        """上传封面图，返回thumb_media_id
+        支持传入图片URL或图片二进制数据
+        """
+        import tempfile
+        import os
+
+        url = f"{WECHAT_API_BASE}/cgi-bin/material/add_material"
+        params = {"access_token": access_token, "type": "image"}
+
+        try:
+            if image_data:
+                # 使用传入的二进制数据
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                    f.write(image_data)
+                    temp_path = f.name
+            elif image_url:
+                # 下载图片
+                resp = requests.get(image_url, timeout=30)
+                with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as f:
+                    f.write(resp.content)
+                    temp_path = f.name
+            else:
+                return ""  # 没有图片，返回空（用默认封面）
+
+            with open(temp_path, "rb") as f:
+                files = {"media": f}
+                resp = requests.post(url, params=params, files=files, timeout=30)
+
+            data = resp.json()
+            if "media_id" not in data:
+                logger.warning(f"上传封面图失败: {data}")
+                return ""
+            return data["media_id"]
+        except Exception as e:
+            logger.error(f"上传封面图异常: {e}")
+            return ""
+        finally:
+            if 'temp_path' in locals() and os.path.exists(temp_path):
+                os.unlink(temp_path)
+
     def _upload_news(self, access_token: str, title: str, content: str,
-                     author: str = "", digest: str = "") -> str:
+                     author: str = "", digest: str = "", cover_url: str = "") -> str:
         """新增永久图文素材，返回media_id"""
         url = f"{WECHAT_API_BASE}/cgi-bin/material/add_news"
         params = {"access_token": access_token}
@@ -50,13 +91,16 @@ class WechatPublisher(BasePublisher):
         else:
             html_content = content
 
+        # 上传封面图
+        thumb_media_id = self._upload_image(access_token, image_url=cover_url)
+
         article = {
             "title": title,
             "author": author,
             "digest": digest or title[:100],  # 摘要，最多120字
             "content": html_content,
             "content_source_url": "",  # 原文链接
-            "thumb_media_id": "",  # 封面图media_id（需先上传图片，暂留空用默认封面）
+            "thumb_media_id": thumb_media_id,  # 封面图media_id
             "need_open_comment": 0,
             "only_fans_can_comment": 0,
         }
@@ -112,6 +156,7 @@ class WechatPublisher(BasePublisher):
 
             author = kwargs.get("author", "")
             digest = kwargs.get("digest", "")
+            cover_url = kwargs.get("cover_url", "")
 
             # 1. 获取access_token
             logger.info("微信公众号发布：获取access_token")
@@ -119,15 +164,29 @@ class WechatPublisher(BasePublisher):
 
             # 2. 上传图文素材
             logger.info(f"微信公众号发布：上传图文素材 title={title[:30]}")
-            media_id = self._upload_news(access_token, title, content, author, digest)
+            media_id = self._upload_news(access_token, title, content, author, digest, cover_url)
 
             # 3. 提交发布
             logger.info(f"微信公众号发布：提交发布 media_id={media_id}")
             publish_id = self._submit_publish(access_token, media_id)
 
-            # 微信发布是异步的，publish_id可用于查询状态
-            # 文章URL需要通过发布状态查询获取，这里先返回占位
+            # 轮询查询发布状态，获取真实文章URL（最多轮询5次，每次间隔3秒）
             article_url = ""
+            for attempt in range(5):
+                import time
+                time.sleep(3)
+                status_data = self._get_publish_status(access_token, publish_id)
+                publish_status = status_data.get("publish_status", -1)
+                if publish_status == 0:
+                    # 发布成功，获取文章URL
+                    article_detail = status_data.get("article_detail", [])
+                    if article_detail:
+                        article_url = article_detail[0].get("url", "")
+                    break
+                elif publish_status == 2:
+                    # 发布失败
+                    break
+                # publish_status=1(发布中)或3(原创审核中)，继续等待
 
             return PublishResult(
                 success=True,
@@ -137,7 +196,8 @@ class WechatPublisher(BasePublisher):
                 raw_response={
                     "publish_id": publish_id,
                     "media_id": media_id,
-                    "message": "微信公众号发布成功（发布后可能需要几分钟生效，文章URL需通过publish_id查询获取）",
+                    "article_url": article_url,
+                    "message": "微信公众号发布成功" if article_url else "微信公众号发布成功（发布后可能需要几分钟生效，文章URL可通过publish_id查询获取）",
                 },
             )
 

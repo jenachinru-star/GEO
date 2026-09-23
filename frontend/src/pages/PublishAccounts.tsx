@@ -5,8 +5,9 @@ import {
 } from 'antd'
 import {
   PlusOutlined, ReloadOutlined, DeleteOutlined,
-  CheckCircleOutlined, CloseCircleOutlined
+  CheckCircleOutlined, CloseCircleOutlined, BarChartOutlined
 } from '@ant-design/icons'
+import { useNavigate } from 'react-router-dom'
 import { PUBLISH_PLATFORMS, PUBLISH_PLATFORM_NAMES } from '@/store/useStore'
 import request from '@/api'
 
@@ -30,6 +31,7 @@ const STATUS_MAP: Record<string, { color: string; label: string }> = {
 }
 
 const PublishAccounts = () => {
+  const navigate = useNavigate()
   const [list, setList] = useState<PublishAccount[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
@@ -65,10 +67,21 @@ const PublishAccounts = () => {
     }
   }
 
-  const handleVerify = async (id: number) => {
+  const handleVerify = async (id: number, platform: string) => {
     try {
-      await request.post(`/publish-accounts/${id}/verify`)
-      message.success('已标记为有效')
+      if (platform === 'wechat') {
+        // 微信公众号调用真实验证API
+        const res: any = await request.post(`/publish-accounts/${id}/verify-real`)
+        if (res.data?.valid) {
+          message.success('验证成功')
+        } else {
+          message.error(`验证失败: ${res.data?.error || 'AppID或AppSecret无效'}`)
+        }
+      } else {
+        // 其他平台手动标记
+        await request.post(`/publish-accounts/${id}/verify`)
+        message.success('已标记为有效')
+      }
       loadList()
     } catch (e) {
       // 错误提示已由拦截器统一弹出
@@ -125,15 +138,36 @@ const PublishAccounts = () => {
       key: 'action',
       render: (_: any, record: PublishAccount) => (
         <Space size="small">
-          {record.login_status !== 'valid' && (
+          {record.platform === 'wechat' && (
+            <Button
+              size="small"
+              type="link"
+              icon={<BarChartOutlined />}
+              onClick={() => navigate(`/publish-accounts/${record.id}/stats`)}
+            >
+              数据
+            </Button>
+          )}
+          {record.platform === 'wechat' ? (
             <Button
               size="small"
               type="link"
               icon={<CheckCircleOutlined />}
-              onClick={() => handleVerify(record.id)}
+              onClick={() => handleVerify(record.id, record.platform)}
             >
-              标记有效
+              验证
             </Button>
+          ) : (
+            record.login_status !== 'valid' && (
+              <Button
+                size="small"
+                type="link"
+                icon={<CheckCircleOutlined />}
+                onClick={() => handleVerify(record.id, record.platform)}
+              >
+                标记有效
+              </Button>
+            )
           )}
           <Popconfirm title="确定删除？" onConfirm={() => handleDelete(record.id)}>
             <Button size="small" type="link" danger icon={<DeleteOutlined />}>
