@@ -88,6 +88,7 @@ class Settings(BaseSettings):
     ALLOWED_ORIGINS: str = "http://localhost:3000,http://localhost:5173"
     # GEO配置
     DEFAULT_SEMANTIC_COUNT: int = 10
+    DEFAULT_BRAND_NAME: str = "GEO创作者中心"
 
     # 模型价格表（人民币元/百万token）
     MODEL_PRICING: dict = {

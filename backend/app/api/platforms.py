@@ -316,13 +316,13 @@ def test_platform(
     try:
         # 创建临时适配器测试
         adapter = OpenAICompatibleAdapter(
-            platform_code=platform_code,
             api_key=api_key,
             base_url=base_url,
             model=model,
             temperature=0.1,
             max_tokens=50,
         )
+        adapter.platform_code = platform_code
         result = adapter.query("你好，请回复'连接成功'")
 
         if result.success:
