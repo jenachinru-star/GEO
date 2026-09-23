@@ -86,6 +86,11 @@ const Monitor = () => {
 
       let pollCount = 0
       const maxPolls = 600
+      // 启动前先清除旧定时器，防止重复点击导致多个轮询并发
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+        pollTimerRef.current = null
+      }
       pollTimerRef.current = setInterval(async () => {
         pollCount++
         try {

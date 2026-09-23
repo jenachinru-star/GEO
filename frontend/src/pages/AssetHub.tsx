@@ -445,7 +445,7 @@ const AssetHub = () => {
                     current={page}
                     total={total}
                     pageSize={20}
-                    onChange={(p) => fetchData(p)}
+                    onChange={(p) => fetchData(p, keyword)}
                   />
                 </div>
               )}

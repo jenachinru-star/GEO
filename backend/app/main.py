@@ -182,7 +182,9 @@ app = FastAPI(
     title=settings.APP_NAME,
     description="GEO内部智能运营中台 - AI生成式搜索引擎优化监测系统",
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
+    docs_url="/docs" if settings.APP_ENV == "development" else None,
+    redoc_url="/redoc" if settings.APP_ENV == "development" else None,
 )
 
 # CORS配置 - 允许前端跨域访问

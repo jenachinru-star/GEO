@@ -70,6 +70,11 @@ const Settings = () => {
 
       let pollCount = 0
       const maxPolls = 600
+      // 启动前先清除旧定时器，防止重复点击导致多个轮询并发
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current)
+        pollTimerRef.current = null
+      }
       pollTimerRef.current = setInterval(async () => {
         pollCount++
         try {
@@ -170,17 +175,19 @@ const Settings = () => {
               </Button>
             </Card>
           </Col>
-          <Col xs={24} sm={12} md={8}>
-            <Card size="small" hoverable>
-              <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>API文档</div>
-              <div style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
-                查看后端API接口文档（Swagger UI）
-              </div>
-              <Button block onClick={() => window.open('/docs', '_blank')}>
-                打开文档
-              </Button>
-            </Card>
-          </Col>
+          {import.meta.env.DEV && (
+            <Col xs={24} sm={12} md={8}>
+              <Card size="small" hoverable>
+                <div style={{ fontSize: 14, fontWeight: 500, marginBottom: 8 }}>API文档</div>
+                <div style={{ fontSize: 12, color: '#64748B', marginBottom: 12 }}>
+                  查看后端API接口文档（Swagger UI，仅开发环境）
+                </div>
+                <Button block onClick={() => window.open('/geo/docs', '_blank')}>
+                  打开文档
+                </Button>
+              </Card>
+            </Col>
+          )}
         </Row>
       </div>
     </div>

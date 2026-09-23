@@ -1,6 +1,6 @@
 ﻿import { useEffect, useState } from 'react'
 import {
-  Row, Col, Card, Table, Button, Space, Select, Tag, Tooltip, Empty, Typography
+  Row, Col, Card, Table, Button, Space, Select, Tag, Tooltip, Empty, Typography, message
 } from 'antd'
 import { ReloadOutlined, InfoCircleOutlined, DownloadOutlined } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
@@ -71,9 +71,9 @@ const UsageDashboard = () => {
     }
   }
 
-  // 导出用量数据
+  // 导出用量数据（待后端实现 /usage/export 接口后启用）
   const handleExport = async () => {
-    await exportApi.exportUsage(days)
+    message.info('用量导出功能开发中，敬请期待')
   }
 
   useEffect(() => {
@@ -226,7 +226,9 @@ const UsageDashboard = () => {
             <Select.Option value={30}>最近30天</Select.Option>
             <Select.Option value={90}>最近90天</Select.Option>
           </Select>
-          <Button icon={<DownloadOutlined />} onClick={handleExport}>导出Excel</Button>
+          <Tooltip title="用量导出功能开发中，敬请期待">
+            <Button icon={<DownloadOutlined />} onClick={handleExport} disabled>导出Excel</Button>
+          </Tooltip>
           <Button icon={<ReloadOutlined />} onClick={loadAll} loading={loading}>刷新</Button>
         </Space>
       </div>

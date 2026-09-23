@@ -7,7 +7,7 @@ import {
   BookOutlined, CopyOutlined
 } from '@ant-design/icons'
 import { ragApi } from '@/api'
-import { PLATFORM_NAMES } from '@/store/useStore'
+import { PLATFORM_NAMES, useAppStore } from '@/store/useStore'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -19,6 +19,8 @@ interface Message {
 
 const RAGChat = () => {
   const [messages, setMessages] = useState<Message[]>([])
+  const { user } = useAppStore()
+  const isAdmin = user?.role === 'admin'
   const [input, setInput] = useState('')
   const [platform, setPlatform] = useState('glm')
   const [level, setLevel] = useState('public')
@@ -38,6 +40,13 @@ const RAGChat = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
+
+  // 普通用户自动降级 confidential 级别
+  useEffect(() => {
+    if (!isAdmin && level === 'confidential') {
+      setLevel('public')
+    }
+  }, [isAdmin, level])
 
   const handleSend = async () => {
     if (!input.trim() || loading) return
@@ -270,7 +279,7 @@ const RAGChat = () => {
                 options={[
                   { value: 'public', label: '公开（默认）' },
                   { value: 'internal', label: '内部' },
-                  { value: 'confidential', label: '涉密' }
+                  { value: 'confidential', label: '涉密（仅管理员）', disabled: !isAdmin }
                 ]}
               />
             </div>

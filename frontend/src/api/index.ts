@@ -175,9 +175,21 @@ const downloadFile = (url: string, filename: string) => {
   return request.get(url, {
     responseType: 'blob',
     timeout: 120000
-  }).then((blob: any) => {
+  }).then(async (blob: any) => {
+    // 检查是否是JSON错误响应（后端返回4xx/5xx时content-type为application/json）
+    if (blob.type && blob.type.includes('application/json')) {
+      const text = await blob.text()
+      try {
+        const err = JSON.parse(text)
+        message.error(err.detail || err.message || '导出失败')
+      } catch {
+        message.error('导出失败')
+      }
+      return
+    }
+    // 正常文件下载
     const file = new Blob([blob], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      type: blob.type || 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(file)
@@ -303,6 +315,9 @@ export const localAuthApi = {
     request.post('/auth/local/reset-password', { email, code, new_password }),
   changePassword: (old_password: string, new_password: string) =>
     request.post('/auth/local/change-password', { old_password, new_password }),
+  getProfile: () => request.get('/auth/local/profile'),
+  updateProfile: (data: { username: string; avatar?: string }) =>
+    request.put('/auth/local/profile', data),
 }
 
 export const usageApi = {

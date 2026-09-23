@@ -29,8 +29,16 @@ const AccountSettings = () => {
   const handleSaveProfile = async (values: any) => {
     setLoading(true)
     try {
-      // 后端接口后续加，现在先提示
-      message.success('资料已保存（演示）')
+      const res: any = await localAuthApi.updateProfile({
+        username: values.username,
+        avatar: values.avatar,
+      })
+      message.success('保存成功')
+      // 更新全局用户信息
+      const state = useAppStore.getState()
+      if (state.token && res.data) {
+        state.setAuth(state.token, { ...state.user, ...res.data })
+      }
     } catch (e: any) {
       message.error('保存失败，请稍后重试')
     } finally {

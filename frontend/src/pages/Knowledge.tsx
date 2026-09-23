@@ -8,7 +8,7 @@ import {
   EditOutlined, SearchOutlined, BookOutlined, SyncOutlined
 } from '@ant-design/icons'
 import { knowledgeApi } from '@/api'
-import { CATEGORY_NAMES } from '@/store/useStore'
+import { CATEGORY_NAMES, useAppStore } from '@/store/useStore'
 import { formatUtcTime } from '@/utils/time'
 
 const categoryTree = [
@@ -23,6 +23,8 @@ const categoryTree = [
 
 const Knowledge = () => {
   const [list, setList] = useState<any[]>([])
+  const { user } = useAppStore()
+  const isAdmin = user?.role === 'admin'
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
   const [drawerVisible, setDrawerVisible] = useState(false)
@@ -321,7 +323,7 @@ const Knowledge = () => {
                       <Select options={[
                         { value: 'public', label: '公开' },
                         { value: 'internal', label: '内部' },
-                        { value: 'confidential', label: '涉密' }
+                        { value: 'confidential', label: '涉密（仅管理员）', disabled: !isAdmin }
                       ]} />
                     </Form.Item>
                   </Col>

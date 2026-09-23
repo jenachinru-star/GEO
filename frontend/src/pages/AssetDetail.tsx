@@ -192,7 +192,7 @@ const AssetDetail = () => {
       })
       message.success('已创建发布草稿，前往编辑')
       // 跳转到发布列表页
-      navigate('/asset/published')
+      navigate('/published')
     } catch (e) {
       message.error('创建发布草稿失败')
     } finally {

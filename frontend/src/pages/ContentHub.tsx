@@ -81,21 +81,28 @@ const ContentHub = () => {
   const loadData = async () => {
     setLoading(true)
     try {
-      const params: any = { page, page_size: 20 }
+      // 后端文章列表不支持keyword搜索，前端拉全量后本地过滤+分页
+      const params: any = { page: 1, page_size: 1000 }
       if (filters.semantic_id) params.semantic_id = filters.semantic_id
       if (filters.status) params.status = filters.status
       const res: any = await articleApi.getList(params)
-      let items = res.data.items || []
+      let allItems = res.data.items || []
+      // 前端本地搜索过滤（全量）
       if (filters.keyword) {
-        items = items.filter((a: any) => a.title?.includes(filters.keyword))
+        allItems = allItems.filter((a: any) => a.title?.includes(filters.keyword))
       }
-      setList(items)
-      setTotal(res.data.total || items.length)
+      // 基于全量数据统计（翻页时不变）
+      const totalFiltered = allItems.length
       setStats({
-        total: res.data.total || 0,
-        published: items.filter((a: any) => a.status === 'published').length,
-        consistent: items.filter((a: any) => a.entity_consistent).length
+        total: totalFiltered,
+        published: allItems.filter((a: any) => a.status === 'published').length,
+        consistent: allItems.filter((a: any) => a.entity_consistent).length
       })
+      // 前端分页
+      const pageSize = 20
+      const start = (page - 1) * pageSize
+      setList(allItems.slice(start, start + pageSize))
+      setTotal(totalFiltered)
     } finally {
       setLoading(false)
     }
@@ -574,14 +581,14 @@ const ContentHub = () => {
             placeholder="搜索标题"
             style={{ width: 200 }}
             value={filters.keyword}
-            onChange={e => setFilters({ ...filters, keyword: e.target.value })}
+            onChange={e => { setPage(1); setFilters({ ...filters, keyword: e.target.value }) }}
             allowClear
           />
           <Select
             placeholder="关联语义"
             style={{ width: 280 }}
             value={filters.semantic_id || undefined}
-            onChange={v => setFilters({ ...filters, semantic_id: v })}
+            onChange={v => { setPage(1); setFilters({ ...filters, semantic_id: v }) }}
             allowClear
             showSearch
             optionFilterProp="label"
@@ -591,7 +598,7 @@ const ContentHub = () => {
             placeholder="状态"
             style={{ width: 120 }}
             value={filters.status || undefined}
-            onChange={v => setFilters({ ...filters, status: v })}
+            onChange={v => { setPage(1); setFilters({ ...filters, status: v }) }}
             allowClear
             options={[
               { value: 'draft', label: '草稿' },

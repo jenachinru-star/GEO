@@ -143,7 +143,7 @@ const Profile = () => {
 
   const handleDownloadLlms = () => {
     const token = localStorage.getItem('geo_token')
-    fetch('/api/v1/template/llms.txt', {
+    fetch('/geo/api/v1/template/llms.txt', {
       headers: { 'Authorization': `Bearer ${token}` }
     }).then(r => {
       if (!r.ok) throw new Error('下载失败')

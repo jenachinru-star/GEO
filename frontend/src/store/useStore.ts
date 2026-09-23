@@ -44,7 +44,14 @@ export const useAppStore = create<AppState>((set) => ({
   clearAuth: () => {
     localStorage.removeItem(TOKEN_KEY)
     localStorage.removeItem(USER_KEY)
-    set({ token: null, user: null })
+    set({
+      token: null,
+      user: null,
+      systemInfo: null,
+      platformList: [],
+      doctorProfile: null,
+      semantics: [],
+    })
   },
   setDoctorProfile: (p) => set({ doctorProfile: p }),
   setSemantics: (list) => set({ semantics: list }),
