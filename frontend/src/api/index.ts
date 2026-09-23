@@ -214,6 +214,7 @@ export const exportApi = {
   exportContent: () => downloadFile('/export/content', `内容资产_${Date.now()}.xlsx`),
   exportReport: () => downloadFile('/export/report', `GEO完整报告_${Date.now()}.xlsx`),
   exportDoctorReport: () => downloadFile('/export/doctor-report', `GEO医生报告_${Date.now()}.xlsx`),
+  exportUsage: (days: number = 30) => downloadFile(`/usage/export?days=${days}`, `用量统计_${days}天_${Date.now()}.xlsx`),
 }
 
 // ============ 认证 API ============

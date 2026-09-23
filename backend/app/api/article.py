@@ -17,6 +17,7 @@ router = APIRouter(prefix="/api/v1/article", tags=["文章管理"])
 def get_articles(
     semantic_id: Optional[int] = None,
     status: Optional[str] = None,
+    keyword: Optional[str] = Query(None, description="搜索关键词（标题+内容）"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
@@ -27,13 +28,27 @@ def get_articles(
         query = query.filter(ArticleDraft.semantic_id == semantic_id)
     if status:
         query = query.filter(ArticleDraft.status == status)
+    if keyword:
+        query = query.filter(
+            ArticleDraft.title.like(f"%{keyword}%") |
+            ArticleDraft.content.like(f"%{keyword}%")
+        )
+
     total = query.count()
+    # 统计各状态数量（基于过滤后的全量数据，不只当前页）
+    published_count = query.filter(ArticleDraft.status == "published").count()
+    draft_count = query.filter(ArticleDraft.status == "draft").count()
+    consistent_count = query.filter(ArticleDraft.entity_consistent == True).count()
+
     items = query.order_by(ArticleDraft.created_at.desc())\
         .offset((page - 1) * page_size).limit(page_size).all()
     return {
         "code": 0, "message": "success",
         "data": {
             "total": total,
+            "published_count": published_count,
+            "draft_count": draft_count,
+            "consistent_count": consistent_count,
             "items": [ArticleOut.model_validate(i).model_dump() for i in items],
             "page": page, "page_size": page_size
         }

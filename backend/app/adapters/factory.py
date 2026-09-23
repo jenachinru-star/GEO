@@ -1,4 +1,5 @@
 from typing import Dict, Optional, List
+import logging
 from app.adapters.base import BaseAdapter
 from app.adapters.deepseek import DeepSeekAdapter
 from app.adapters.glm import GLMAdapter
@@ -9,6 +10,8 @@ from app.adapters.image_seedream import SeedreamImageAdapter
 from app.adapters.video_base import BaseVideoAdapter
 from app.adapters.video_seedance import SeedanceVideoAdapter
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 class AdapterFactory:
@@ -124,6 +127,57 @@ class AdapterFactory:
         self._init_adapters()
         self._init_image_adapter()
         self._init_video_adapter()
+
+    def load_from_db(self, db):
+        """从Platform表读取配置并初始化适配器（数据库优先，.env兜底）
+
+        如果Platform表有启用的平台配置，用数据库配置覆盖.env配置。
+        如果Platform表为空，保持.env配置不变。
+        生图/生视频适配器不受影响，仍从.env读取。
+        """
+        from app.models.platform import Platform
+        from app.adapters.openai_compatible import OpenAICompatibleAdapter
+
+        try:
+            db_platforms = db.query(Platform).filter(Platform.status == True).all()
+            if not db_platforms:
+                logger.info("Platform表为空，使用.env配置")
+                return
+
+            logger.info(f"从Platform表读取 {len(db_platforms)} 个平台配置")
+            new_adapters = {}
+            for p in db_platforms:
+                try:
+                    adapter = OpenAICompatibleAdapter(
+                        api_key=p.api_key,
+                        base_url=p.base_url,
+                        model=p.model,
+                        temperature=p.temperature or 0.3,
+                        max_tokens=p.max_tokens or 2000,
+                        timeout=p.timeout or 120,
+                    )
+                    adapter.platform_code = p.code
+                    new_adapters[p.code] = adapter
+                    logger.info(f"  平台 {p.code} 已从数据库加载")
+                except Exception as e:
+                    logger.error(f"  平台 {p.code} 加载失败: {e}，回退到.env配置")
+                    env_adapter = self._adapters.get(p.code)
+                    if env_adapter:
+                        new_adapters[p.code] = env_adapter
+
+            self._adapters = new_adapters
+            logger.info(f"Platform表配置加载完成，共 {len(self._adapters)} 个平台")
+        except Exception as e:
+            logger.error(f"从Platform表加载配置失败，保持.env配置: {e}")
+
+    def reload_from_db(self, db):
+        """重新从Platform表加载配置（管理员修改后调用）
+
+        先重置为.env配置，再从数据库加载覆盖。
+        """
+        self._adapters = {}
+        self._init_adapters()
+        self.load_from_db(db)
 
 
 # 全局单例

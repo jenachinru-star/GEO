@@ -66,7 +66,7 @@ def save_profile(data: dict, db: Session = Depends(get_db), user_id: int = Depen
     semantic_count = db.query(Semantic).filter(Semantic.user_id == user_id).count()
     generated_count = 0
     if is_new or semantic_count == 0:
-        generator = SemanticGenerator()
+        generator = SemanticGenerator(db=db, user_id=user_id)
         questions = generator.generate({
             "real_name": profile.real_name,
             "title": profile.title,
@@ -109,7 +109,7 @@ def regenerate_semantics(db: Session = Depends(get_db), user_id: int = Depends(g
     if not profile:
         raise HTTPException(status_code=400, detail="请先完善Profile")
 
-    generator = SemanticGenerator()
+    generator = SemanticGenerator(db=db, user_id=user_id)
     questions = generator.generate({
         "real_name": profile.real_name,
         "title": profile.title,

@@ -199,8 +199,8 @@ def create_platform(
     db.commit()
     db.refresh(platform)
 
-    # 热更新适配器
-    adapter_factory.reload()
+    # 热更新适配器（从Platform表重新加载）
+    adapter_factory.reload_from_db(db)
     logger.info(f"创建平台配置: {req.code} ({req.name})，已热更新适配器")
 
     return {"code": 0, "message": "创建成功", "data": platform.to_dict()}
@@ -227,8 +227,8 @@ def update_platform(
     db.commit()
     db.refresh(platform)
 
-    # 热更新适配器
-    adapter_factory.reload()
+    # 热更新适配器（从Platform表重新加载）
+    adapter_factory.reload_from_db(db)
     logger.info(f"更新平台配置: {platform_code}，已热更新适配器")
 
     return {"code": 0, "message": "更新成功", "data": platform.to_dict()}
@@ -250,8 +250,8 @@ def delete_platform(
     db.delete(platform)
     db.commit()
 
-    # 热更新适配器
-    adapter_factory.reload()
+    # 热更新适配器（从Platform表重新加载）
+    adapter_factory.reload_from_db(db)
     logger.info(f"删除平台配置: {platform_code}，已热更新适配器")
 
     return {"code": 0, "message": "删除成功"}
@@ -274,8 +274,8 @@ def toggle_platform(
     db.commit()
     db.refresh(platform)
 
-    # 热更新适配器
-    adapter_factory.reload()
+    # 热更新适配器（从Platform表重新加载）
+    adapter_factory.reload_from_db(db)
     logger.info(f"切换平台状态: {platform_code} -> {'启用' if platform.status else '停用'}，已热更新")
 
     return {"code": 0, "message": "操作成功", "data": {"status": platform.status}}
@@ -363,10 +363,11 @@ def test_platform(
 
 @router.post("/reload", summary="重新加载适配器（热更新）")
 def reload_adapters(
+    db: Session = Depends(get_db),
     user_id: int = Depends(get_current_admin_id),
 ):
     """手动触发适配器重新加载（一般不需要，配置变更时会自动 reload）"""
-    adapter_factory.reload()
+    adapter_factory.reload_from_db(db)
     enabled = adapter_factory.get_enabled_platforms()
     logger.info(f"手动重新加载适配器，当前启用平台: {enabled}")
     return {"code": 0, "message": "重载成功", "data": {"enabled_platforms": enabled}}

@@ -56,7 +56,8 @@ class RAGEngine:
         return results
 
     def generate_answer(self, query: str, platform_code: str = "glm",
-                        level: str = "public", history: List[dict] = None) -> Dict:
+                        level: str = "public", history: List[dict] = None,
+                        user_id: int = None) -> Dict:
         """基于知识库生成回答（支持多轮对话）
         Args:
             query: 当前用户问题
@@ -106,7 +107,29 @@ class RAGEngine:
 {history_text if history_text else "（无历史对话）"}
 """
 
-        # 5. 调用大模型
+        # 5. 调用大模型（过滤用户停用的平台）
+        if user_id:
+            from app.models.user_platform_pref import UserPlatformPref
+            disabled = {
+                pref.platform_code for pref in
+                self.db.query(UserPlatformPref).filter(
+                    UserPlatformPref.user_id == user_id,
+                    UserPlatformPref.enabled == False
+                ).all()
+            }
+            if platform_code in disabled:
+                enabled = [p for p in adapter_factory.get_enabled_platforms() if p not in disabled]
+                if enabled:
+                    logger.info(f"用户 [{user_id}] 已停用原平台 {platform_code}，自动回退到 {enabled[0]}")
+                    platform_code = enabled[0]
+                else:
+                    return {
+                        "answer": "没有已启用的AI平台，请在设置中启用至少一个平台",
+                        "sources": [],
+                        "platform": "none",
+                        "success": False
+                    }
+
         adapter = adapter_factory.get_adapter(platform_code)
         if not adapter:
             adapter = adapter_factory.get_adapter(adapter_factory.get_enabled_platforms()[0])

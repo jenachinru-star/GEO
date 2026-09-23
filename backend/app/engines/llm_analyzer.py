@@ -60,16 +60,31 @@ class LLMAnalyzer:
     def __init__(self, platform_code: str = None):
         self.platform_code = platform_code
 
-    def _get_adapter(self):
+    def _get_adapter(self, db=None, user_id: int = None):
         if self.platform_code:
             return adapter_factory.get_adapter(self.platform_code)
         platforms = adapter_factory.get_enabled_platforms()
+
+        # 过滤用户停用的平台
+        if user_id and db:
+            from app.models.user_platform_pref import UserPlatformPref
+            disabled = {
+                pref.platform_code for pref in
+                db.query(UserPlatformPref).filter(
+                    UserPlatformPref.user_id == user_id,
+                    UserPlatformPref.enabled == False
+                ).all()
+            }
+            if disabled:
+                logger.info(f"用户 [{user_id}] 已停用平台: {disabled}，LLM分析时跳过")
+                platforms = [p for p in platforms if p not in disabled]
+
         if platforms:
             return adapter_factory.get_adapter(platforms[0])
         return None
 
     def analyze(self, raw_answer: str, doctor_name: str, hospital: str = "",
-                department: str = "") -> LLMResult:
+                department: str = "", db=None, user_id: int = None) -> LLMResult:
         """
         调用LLM分析回答。
 
@@ -78,11 +93,13 @@ class LLMAnalyzer:
             doctor_name: 医生姓名
             hospital: 医院名称
             department: 科室名称
+            db: 数据库session（用于查询用户平台开关）
+            user_id: 用户ID（用于过滤用户停用的平台）
 
         Returns:
             LLMResult，调用失败时返回默认值（降级）
         """
-        adapter = self._get_adapter()
+        adapter = self._get_adapter(db=db, user_id=user_id)
         if not adapter:
             logger.warning("无可用AI平台，LLM分析降级为默认值")
             return LLMResult()

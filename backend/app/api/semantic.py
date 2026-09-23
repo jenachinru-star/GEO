@@ -99,7 +99,7 @@ def extend_semantic(
     # 获取现有问题列表（用于去重）
     existing = [q.question for q in db.query(Semantic).filter(Semantic.user_id == user_id).all()]
 
-    extender = SemanticExtender()
+    extender = SemanticExtender(db=db, user_id=user_id)
     result = extender.extend(s.question, profile_dict, existing)
 
     return {"code": 0, "message": "success", "data": result}
@@ -132,7 +132,7 @@ def extend_batch(
 
     existing = [q.question for q in db.query(Semantic).filter(Semantic.user_id == user_id).all()]
 
-    extender = SemanticExtender()
+    extender = SemanticExtender(db=db, user_id=user_id)
     questions = [s.question for s in semantics]
     results = extender.extend_batch(questions, profile_dict, existing)
 

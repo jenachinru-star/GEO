@@ -71,9 +71,9 @@ const UsageDashboard = () => {
     }
   }
 
-  // 导出用量数据（待后端实现 /usage/export 接口后启用）
-  const handleExport = async () => {
-    message.info('用量导出功能开发中，敬请期待')
+  // 导出用量数据
+  const handleExport = () => {
+    exportApi.exportUsage(days)
   }
 
   useEffect(() => {
@@ -226,9 +226,7 @@ const UsageDashboard = () => {
             <Select.Option value={30}>最近30天</Select.Option>
             <Select.Option value={90}>最近90天</Select.Option>
           </Select>
-          <Tooltip title="用量导出功能开发中，敬请期待">
-            <Button icon={<DownloadOutlined />} onClick={handleExport} disabled>导出Excel</Button>
-          </Tooltip>
+          <Button icon={<DownloadOutlined />} onClick={handleExport}>导出Excel</Button>
           <Button icon={<ReloadOutlined />} onClick={loadAll} loading={loading}>刷新</Button>
         </Space>
       </div>

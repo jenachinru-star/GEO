@@ -45,7 +45,7 @@ def handle_article_generate(db: Session, task: AsyncTask, on_progress: ProgressC
     if on_progress:
         on_progress(2, 3, "LLM生成文章中")
 
-    generator = ArticleGenerator(db)
+    generator = ArticleGenerator(db, user_id=user_id)
     result = generator.generate(semantic, profile, opportunity)
 
     if on_progress:

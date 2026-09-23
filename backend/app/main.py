@@ -127,6 +127,14 @@ async def lifespan(app: FastAPI):
     init_db()
     print("✅ 数据库初始化完成")
 
+    # 从Platform表加载平台配置（数据库优先，.env兜底）
+    from app.adapters import adapter_factory
+    db = SessionLocal()
+    try:
+        adapter_factory.load_from_db(db)
+    finally:
+        db.close()
+
     # 启动 LLM 用量日志记录器
     from app.usage_logger import usage_logger
     usage_logger.start()

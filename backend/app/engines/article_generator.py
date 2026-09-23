@@ -65,8 +65,9 @@ ARTICLE_GENERATION_PROMPT = """你是一位专业的医疗科普内容编辑。�
 
 
 class ArticleGenerator:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, user_id: int = None):
         self.db = db
+        self.user_id = user_id
 
     def generate(self, semantic: Semantic, profile: DoctorProfile,
                  opportunity: Optional[ContentOpportunity] = None) -> dict:
@@ -90,8 +91,23 @@ class ArticleGenerator:
 
         # 检查是否有可用的 AI 平台
         platforms = adapter_factory.get_enabled_platforms()
+
+        # 过滤用户停用的平台
+        if self.user_id:
+            from app.models.user_platform_pref import UserPlatformPref
+            disabled = {
+                pref.platform_code for pref in
+                self.db.query(UserPlatformPref).filter(
+                    UserPlatformPref.user_id == self.user_id,
+                    UserPlatformPref.enabled == False
+                ).all()
+            }
+            if disabled:
+                logger.info(f"用户 [{self.user_id}] 已停用平台: {disabled}，文章生成时跳过")
+                platforms = [p for p in platforms if p not in disabled]
+
         if not platforms:
-            logger.info("无可用AI平台，跳过 LLM 生成")
+            logger.info("无可用AI平台，跳过 LLM 生成，使用模板兜底")
             return None
 
         adapter = adapter_factory.get_adapter(platforms[0])
@@ -204,5 +220,5 @@ class ArticleGenerator:
 
 
 # 移除全局单例，每次请求创建新实例（ArticleGenerator无状态，仅持有db引用）
-def get_article_generator(db: Session) -> ArticleGenerator:
-    return ArticleGenerator(db)
+def get_article_generator(db: Session, user_id: int = None) -> ArticleGenerator:
+    return ArticleGenerator(db, user_id=user_id)

@@ -80,10 +80,10 @@ const PlatformConfig = () => {
       const values = await form.validateFields()
       if (editingPlatform) {
         await platformsApi.update(editingPlatform.code, values)
-        message.success('平台配置更新成功')
+        message.success('配置已生效')
       } else {
         await platformsApi.create(values)
-        message.success('平台创建成功')
+        message.success('配置已生效')
       }
       setModalVisible(false)
       loadPlatforms()
@@ -262,7 +262,7 @@ const PlatformConfig = () => {
           </Button>
         </Space>
         <div style={{ fontSize: 12, color: '#64748B' }}>
-          提示：数据库配置优先于 .env 配置；修改配置后自动热更新，无需重启服务
+          数据库配置优先，.env兜底（修改后立即生效，无需重启）
         </div>
       </div>
 

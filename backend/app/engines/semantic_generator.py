@@ -25,8 +25,10 @@ class SemanticGenerator:
 
 输出格式：每行一个问题，不要编号，不要解释，不要markdown。"""
 
-    def __init__(self, platform_code: str = None):
+    def __init__(self, platform_code: str = None, db=None, user_id: int = None):
         self.platform_code = platform_code
+        self.db = db
+        self.user_id = user_id
 
     def generate(self, profile: dict) -> List[str]:
         """生成语义问题列表"""
@@ -80,11 +82,30 @@ class SemanticGenerator:
         return self._fallback_generate(profile)
 
     def _get_adapters(self):
-        """返回所有已启用平台的适配器列表（按优先级顺序）"""
+        """返回所有已启用平台的适配器列表（按优先级顺序），过滤用户停用的平台"""
         if self.platform_code:
             adapter = adapter_factory.get_adapter(self.platform_code)
             return [(self.platform_code, adapter)] if adapter else []
         platforms = adapter_factory.get_enabled_platforms()
+
+        # 过滤用户停用的平台
+        if self.user_id and self.db:
+            from app.models.user_platform_pref import UserPlatformPref
+            disabled = {
+                pref.platform_code for pref in
+                self.db.query(UserPlatformPref).filter(
+                    UserPlatformPref.user_id == self.user_id,
+                    UserPlatformPref.enabled == False
+                ).all()
+            }
+            if disabled:
+                logger.info(f"用户 [{self.user_id}] 已停用平台: {disabled}，语义生成时跳过")
+                platforms = [p for p in platforms if p not in disabled]
+
+        if not platforms:
+            logger.warning("没有已启用的AI平台")
+            return []
+
         adapters = []
         for code in platforms:
             adapter = adapter_factory.get_adapter(code)

@@ -518,3 +518,72 @@ def get_my_logs(
         }
     }
 
+
+# ============ 用量导出 ============
+
+@router.get("/export", summary="导出用量统计为Excel")
+def export_usage(
+    days: int = Query(30, ge=1, le=90, description="导出最近N天的数据"),
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    """导出用量统计为Excel文件（管理员导出全部，普通用户导出自己的）"""
+    from openpyxl import Workbook
+    from io import BytesIO
+    from fastapi.responses import StreamingResponse
+
+    # 管理员可导出所有用户，普通用户只导出自己的
+    user = db.query(User).filter(User.id == user_id).first()
+    is_admin = user and user.role == "admin"
+
+    query = db.query(LlmUsageLog)
+    if not is_admin:
+        query = query.filter(LlmUsageLog.user_id == user_id)
+
+    start_date = datetime.now() - timedelta(days=days)
+    query = query.filter(LlmUsageLog.created_at >= start_date)
+    logs = query.order_by(LlmUsageLog.created_at.desc()).all()
+
+    # 生成Excel
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "用量统计"
+    ws.append(["时间", "用户ID", "平台", "模型", "任务类型", "prompt_tokens", "completion_tokens", "total_tokens", "耗时(ms)", "成功"])
+    for log in logs:
+        ws.append([
+            log.created_at.strftime("%Y-%m-%d %H:%M:%S") if log.created_at else "",
+            log.user_id,
+            log.platform,
+            log.model,
+            log.task_type,
+            log.prompt_tokens,
+            log.completion_tokens,
+            log.total_tokens,
+            log.latency_ms,
+            "是" if log.success else "否",
+        ])
+
+    # 自适应列宽
+    for col in ws.columns:
+        max_length = 0
+        column = col[0].column_letter
+        for cell in col:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        ws.column_dimensions[column].width = min(max_length + 2, 50)
+
+    # 输出为文件流
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+
+    filename = f"用量统计_{days}天_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+

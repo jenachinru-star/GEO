@@ -244,7 +244,8 @@ class CollectorEngine:
                 if result.geo_mentioned:
                     try:
                         llm_result = llm_analyzer.analyze(
-                            answer, profile.real_name, profile.hospital, profile.department
+                            answer, profile.real_name, profile.hospital, profile.department,
+                            db=self.db, user_id=user_id
                         )
                         is_recommendation = llm_result.is_recommendation
                         recommendation_evidence = llm_result.recommendation_evidence

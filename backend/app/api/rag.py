@@ -20,14 +20,27 @@ def rag_query(data: RAGQuery, db: Session = Depends(get_db), user_id: int = Depe
 
     rag = RAGEngine(db)
     history = [h.model_dump() for h in data.history] if data.history else []
-    result = rag.generate_answer(data.query, data.platform, effective_level, history)
+    result = rag.generate_answer(data.query, data.platform, effective_level, history, user_id=user_id)
     return {"code": 0, "message": "success", "data": result}
 
 
 @router.get("/platforms", summary="获取可用的AI平台")
-def get_platforms(user_id: int = Depends(get_current_user_id)):
+def get_platforms(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     from app.adapters import adapter_factory
+    from app.models.user_platform_pref import UserPlatformPref
     platforms = adapter_factory.get_enabled_platforms()
+
+    # 过滤用户停用的平台
+    disabled = {
+        pref.platform_code for pref in
+        db.query(UserPlatformPref).filter(
+            UserPlatformPref.user_id == user_id,
+            UserPlatformPref.enabled == False
+        ).all()
+    }
+    if disabled:
+        platforms = [p for p in platforms if p not in disabled]
+
     platform_names = {"deepseek": "DeepSeek", "glm": "GLM", "minimax": "MiniMax", "doubao": "豆包", "qwen": "通义千问"}
     return {"code": 0, "message": "success", "data": [
         {"code": p, "name": platform_names.get(p, p)} for p in platforms

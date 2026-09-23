@@ -81,28 +81,21 @@ const ContentHub = () => {
   const loadData = async () => {
     setLoading(true)
     try {
-      // 后端文章列表不支持keyword搜索，前端拉全量后本地过滤+分页
-      const params: any = { page: 1, page_size: 1000 }
+      // 后端支持keyword搜索和统计字段，直接传参分页请求
+      const params: any = { page, page_size: 20 }
       if (filters.semantic_id) params.semantic_id = filters.semantic_id
       if (filters.status) params.status = filters.status
+      if (filters.keyword) params.keyword = filters.keyword
       const res: any = await articleApi.getList(params)
-      let allItems = res.data.items || []
-      // 前端本地搜索过滤（全量）
-      if (filters.keyword) {
-        allItems = allItems.filter((a: any) => a.title?.includes(filters.keyword))
-      }
-      // 基于全量数据统计（翻页时不变）
-      const totalFiltered = allItems.length
+      const data = res.data || {}
+      setList(data.items || [])
+      setTotal(data.total || 0)
+      // 使用后端返回的全量统计字段（翻页时不变）
       setStats({
-        total: totalFiltered,
-        published: allItems.filter((a: any) => a.status === 'published').length,
-        consistent: allItems.filter((a: any) => a.entity_consistent).length
+        total: data.total || 0,
+        published: data.published_count || 0,
+        consistent: data.consistent_count || 0
       })
-      // 前端分页
-      const pageSize = 20
-      const start = (page - 1) * pageSize
-      setList(allItems.slice(start, start + pageSize))
-      setTotal(totalFiltered)
     } finally {
       setLoading(false)
     }
