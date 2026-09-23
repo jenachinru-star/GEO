@@ -17,6 +17,10 @@ class PublishAccount(Base):
     platform = Column(String(50), nullable=False, index=True)  # baijiahao/wechat/zhihu/douyin...
     account_name = Column(String(200), default="")  # 账号昵称/展示名
 
+    # API密钥类（微信公众号等需要AppID/AppSecret的平台）
+    app_id = Column(String(200), default="")  # 应用ID / AppID
+    app_secret = Column(String(500), default="")  # 应用密钥 / AppSecret（加密存储）
+
     # 凭证（加密存储，这里先存明文，后续加密）
     credential = Column(Text, default="")  # cookie 或 access_token
 

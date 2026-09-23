@@ -136,6 +136,67 @@ def retry_distribution(
     return {"code": 0, "message": "success", "data": {"id": dist.id, "status": dist.status, "retry_count": dist.retry_count}}
 
 
+@router.post("/{dist_id}/publish", summary="一键发布到平台（异步任务）")
+def publish_to_platform(
+    dist_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """一键发布文章到指定平台（异步任务）"""
+    import json
+    from app.models.task import AsyncTask
+    from app.services.workspace_service import get_user_workspace_id
+
+    dist = db.query(ArticleDistribution).filter(
+        ArticleDistribution.id == dist_id, ArticleDistribution.user_id == user_id
+    ).first()
+    if not dist:
+        raise HTTPException(status_code=404, detail="发布记录不存在")
+
+    if dist.status == "published":
+        raise HTTPException(status_code=400, detail="该文章已发布，请勿重复发布")
+
+    if dist.status in ("processing", "scheduled"):
+        raise HTTPException(status_code=400, detail="该文章正在发布中，请稍候")
+
+    # 更新状态为processing
+    dist.status = "processing"
+    dist.publish_mode = "auto"
+    dist.note = "一键发布任务已提交，等待执行"
+    dist.failed_reason = ""
+    db.commit()
+
+    # 投递异步任务
+    workspace_id = get_user_workspace_id(db, user_id)
+    task = AsyncTask(
+        workspace_id=workspace_id,
+        task_type="article_publish",
+        status="queued",
+        progress=0,
+        progress_message="等待执行",
+        created_by=user_id,
+        payload_json=json.dumps({
+            "article_id": dist.article_id,
+            "distribution_id": dist.id,
+            "platform": dist.platform,
+        }, ensure_ascii=False),
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
+
+    return {
+        "code": 0,
+        "message": "发布任务已提交",
+        "data": {
+            "task_id": task.id,
+            "distribution_id": dist.id,
+            "platform": dist.platform,
+            "status": "queued",
+        }
+    }
+
+
 @router.delete("/{dist_id}", summary="删除分发记录（物理删除，仅 draft 状态允许）")
 def delete_distribution(
     dist_id: int,

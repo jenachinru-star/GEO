@@ -33,6 +33,7 @@ const PublishAccounts = () => {
   const [list, setList] = useState<PublishAccount[]>([])
   const [loading, setLoading] = useState(false)
   const [modalVisible, setModalVisible] = useState(false)
+  const [selectedPlatform, setSelectedPlatform] = useState('')
   const [form] = Form.useForm()
 
   const loadList = async () => {
@@ -56,6 +57,7 @@ const PublishAccounts = () => {
       await request.post('/publish-accounts', values)
       message.success('添加成功')
       setModalVisible(false)
+      setSelectedPlatform('')
       form.resetFields()
       loadList()
     } catch (e) {
@@ -171,16 +173,22 @@ const PublishAccounts = () => {
       <Modal
         title="添加发布账号"
         open={modalVisible}
-        onCancel={() => setModalVisible(false)}
+        onCancel={() => { setModalVisible(false); setSelectedPlatform(''); form.resetFields() }}
         onOk={() => form.submit()}
         width={560}
       >
         <Form form={form} layout="vertical" onFinish={handleCreate}>
-          <Form.Item name="platform" label="平台" rules={[{ required: true, message: '请选择平台' }]}>
-            <Select showSearch placeholder="选择发布平台" optionFilterProp="label">
+          <Form.Item name="platform" label="发布平台" rules={[{ required: true, message: '请选择平台' }]}>
+            <Select
+              placeholder="选择发布平台"
+              showSearch
+              optionFilterProp="label"
+              onChange={(value) => setSelectedPlatform(value)}
+            >
               {PUBLISH_PLATFORMS.map((p: any) => (
                 <Select.Option key={p.code} value={p.code} label={p.name}>
                   {p.name}
+                  {p.code === 'wechat' && <span style={{ color: '#52c41a', fontSize: 12, marginLeft: 8 }}>（官方API一键发布）</span>}
                 </Select.Option>
               ))}
             </Select>
@@ -188,9 +196,26 @@ const PublishAccounts = () => {
           <Form.Item name="account_name" label="账号名称" rules={[{ required: true, message: '请输入账号名称' }]}>
             <Input placeholder="如：张三医生公众号" />
           </Form.Item>
-          <Form.Item name="credential" label="登录凭证（Cookie/Token）" rules={[{ required: true, message: '请输入登录凭证' }]}>
-            <TextArea rows={4} placeholder="粘贴平台登录后的Cookie或Access Token" />
-          </Form.Item>
+
+          {/* 微信公众号：显示 AppID + AppSecret */}
+          {selectedPlatform === 'wechat' && (
+            <>
+              <Form.Item name="app_id" label="AppID" rules={[{ required: true, message: '请填写AppID' }]}>
+                <Input placeholder="微信公众号的AppID（开发者ID）" />
+              </Form.Item>
+              <Form.Item name="app_secret" label="AppSecret" rules={[{ required: true, message: '请填写AppSecret' }]}>
+                <Input.Password placeholder="微信公众号的AppSecret（开发者密码）" />
+              </Form.Item>
+            </>
+          )}
+
+          {/* 其他平台：显示 Cookie/Token */}
+          {selectedPlatform && selectedPlatform !== 'wechat' && (
+            <Form.Item name="credential" label="登录凭证（Cookie/Token）" rules={[{ required: true, message: '请输入登录凭证' }]}>
+              <TextArea rows={4} placeholder="粘贴平台登录后的Cookie或Access Token" />
+            </Form.Item>
+          )}
+
           <Form.Item name="note" label="备注">
             <TextArea rows={2} placeholder="账号用途、注意事项等" />
           </Form.Item>

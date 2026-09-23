@@ -95,3 +95,13 @@ def init_db():
                 if col not in cols:
                     conn.execute(text(f"ALTER TABLE geo_doctor_profile ADD COLUMN {col} {col_def}"))
         conn.commit()
+
+    # 迁移：geo_publish_account 加 app_id/app_secret 字段（幂等）
+    with engine.connect() as conn:
+        cols = [row[1] for row in conn.execute(text("PRAGMA table_info(geo_publish_account)"))]
+        if cols:
+            if 'app_id' not in cols:
+                conn.execute(text("ALTER TABLE geo_publish_account ADD COLUMN app_id VARCHAR(200) DEFAULT ''"))
+            if 'app_secret' not in cols:
+                conn.execute(text("ALTER TABLE geo_publish_account ADD COLUMN app_secret VARCHAR(500) DEFAULT ''"))
+        conn.commit()

@@ -278,6 +278,7 @@ export const distributionApi = {
   delete: (id: number) => request.delete(`/distribution/${id}`),
   getEffect: (id: number) => request.get(`/distribution/${id}/effect`),
   recollect: (id: number) => request.post(`/distribution/${id}/recollect`),
+  publish: (id: number) => request.post(`/distribution/${id}/publish`),
 }
 
 // ============ 工具配置 API ============

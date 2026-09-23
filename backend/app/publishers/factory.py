@@ -5,14 +5,18 @@
 from typing import Dict, Optional
 from app.publishers.base import BasePublisher
 from app.publishers._manual import ManualPublisher
+from app.publishers.wechat import WechatPublisher
+from app.publishers.zhihu import ZhihuPublisher
+from app.publishers.baijiahao import BaijiahaoPublisher
+from app.publishers.xiaohongshu import XiaohongshuPublisher
 
 
 # 已接入的发布器注册表
 _REGISTRY: Dict[str, type] = {
-    # 未来接入：
-    # "wechat": WechatMpPublisher,
-    # "baijiahao": BaijiahaoPublisher,
-    # "zhihu": ZhihuPublisher,
+    "wechat": WechatPublisher,
+    "zhihu": ZhihuPublisher,
+    "baijiahao": BaijiahaoPublisher,
+    "xiaohongshu": XiaohongshuPublisher,
 }
 
 

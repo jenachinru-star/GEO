@@ -15,13 +15,17 @@ router = APIRouter(prefix="/api/v1/publish-accounts", tags=["发布账号"])
 class AccountCreate(BaseModel):
     platform: str = Field(..., description="平台code：baijiahao/wechat/zhihu/douyin...")
     account_name: str = Field("", description="账号昵称")
-    credential: str = Field("", description="登录凭证（cookie/token）")
+    credential: str = Field("", description="登录凭证（cookie/token），非微信平台使用")
+    app_id: str = Field("", description="应用ID/AppID，微信公众号等平台使用")
+    app_secret: str = Field("", description="应用密钥/AppSecret，微信公众号等平台使用（加密存储）")
     note: str = Field("", description="备注")
 
 
 class AccountUpdate(BaseModel):
     account_name: Optional[str] = None
     credential: Optional[str] = None
+    app_id: Optional[str] = None
+    app_secret: Optional[str] = None  # 留空表示不修改
     login_status: Optional[str] = None
     note: Optional[str] = None
 
@@ -63,6 +67,8 @@ def create_account(
         platform=data.platform,
         account_name=data.account_name,
         credential=encrypt(data.credential),
+        app_id=data.app_id,
+        app_secret=encrypt(data.app_secret),
         note=data.note,
         login_status="unknown",
     )
@@ -94,6 +100,11 @@ def update_account(
         account.account_name = data.account_name
     if data.credential is not None:
         account.credential = encrypt(data.credential)
+    if data.app_id is not None:
+        account.app_id = data.app_id
+    if data.app_secret is not None and data.app_secret != "":
+        # 留空表示不修改
+        account.app_secret = encrypt(data.app_secret)
     if data.login_status is not None:
         account.login_status = data.login_status
     if data.note is not None:

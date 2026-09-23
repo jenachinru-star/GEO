@@ -8,9 +8,9 @@ import {
 import {
   PlusOutlined, ReloadOutlined, EyeOutlined, CheckOutlined,
   ClockCircleOutlined, SyncOutlined, DeleteOutlined, LinkOutlined,
-  FileTextOutlined, BarChartOutlined, CloseOutlined
+  FileTextOutlined, BarChartOutlined, CloseOutlined, SendOutlined
 } from '@ant-design/icons'
-import { distributionApi, articleApi } from '@/api'
+import { distributionApi, articleApi, taskApi } from '@/api'
 import { PUBLISH_PLATFORMS, PUBLISH_PLATFORM_NAMES } from '@/store/useStore'
 import EffectTracker from '@/components/EffectTracker'
 
@@ -39,11 +39,20 @@ const Distribution = () => {
   const [effectVisible, setEffectVisible] = useState(false)
   const [form] = Form.useForm()
   const [filters, setFilters] = useState({ status: '' as string, platform: '' as string })
+  const [publishingId, setPublishingId] = useState<number | null>(null)
+  const [publishPollTimer, setPublishPollTimer] = useState<number | null>(null)
 
   useEffect(() => {
     loadArticles()
     loadList()
   }, [filters])
+
+  // 组件卸载时清除轮询定时器
+  useEffect(() => {
+    return () => {
+      if (publishPollTimer) clearInterval(publishPollTimer)
+    }
+  }, [publishPollTimer])
 
   const loadArticles = async () => {
     try {
@@ -127,6 +136,43 @@ const Distribution = () => {
     }
   }
 
+  const handleAutoPublish = async (record: any) => {
+    try {
+      setPublishingId(record.id)
+      const res: any = await distributionApi.publish(record.id)
+      const taskId = res.data?.task_id
+      message.success('发布任务已提交，正在发布中...')
+
+      // 轮询任务状态
+      if (publishPollTimer) clearInterval(publishPollTimer)
+      const timer = window.setInterval(async () => {
+        try {
+          const taskRes: any = await taskApi.get(taskId)
+          const status = taskRes.data?.status
+          if (status === 'succeeded') {
+            clearInterval(timer)
+            setPublishPollTimer(null)
+            setPublishingId(null)
+            message.success('发布成功！')
+            loadList()
+          } else if (status === 'failed') {
+            clearInterval(timer)
+            setPublishPollTimer(null)
+            setPublishingId(null)
+            message.error(taskRes.data?.error_message || '发布失败')
+            loadList()
+          }
+        } catch (e) {
+          // 轮询错误静默
+        }
+      }, 3000)
+      setPublishPollTimer(timer)
+    } catch (e) {
+      setPublishingId(null)
+      // 错误提示已由拦截器统一弹出
+    }
+  }
+
   const handleViewDetail = (record: any) => {
     setCurrentRecord(record)
     setDetailDrawer(true)
@@ -185,6 +231,21 @@ const Distribution = () => {
       title: '操作', key: 'action', width: 280, fixed: 'right' as const,
       render: (_: any, record: any) => {
         const actions = []
+        // 草稿/已排期 → 一键发布（走异步任务）
+        if (record.status === 'draft' || record.status === 'scheduled') {
+          actions.push(
+            <Button
+              key="auto-publish"
+              size="small"
+              type="primary"
+              icon={<SendOutlined />}
+              loading={publishingId === record.id}
+              onClick={() => handleAutoPublish(record)}
+            >
+              一键发布
+            </Button>
+          )
+        }
         // 草稿 → 排期
         if (record.status === 'draft') {
           actions.push(
