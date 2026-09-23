@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     MINIMAX_API_KEY: str = ""
     MINIMAX_BASE_URL: str = ""
     MINIMAX_MODEL: str = "MiniMax-M2.7-highspeed"
+    MINIMAX_TIMEOUT: int = 60  # minimax代理不稳定，单独配置超时（秒）
 
     # 创作工具跳转地址
     ARTICLE_TOOL_URL: str = "https://ops.szcczh.com/paper-next/"

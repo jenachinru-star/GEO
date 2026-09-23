@@ -77,7 +77,7 @@ const TaskCenter = () => {
       width: 200,
       render: (type: string, record: any) => (
         <div>
-          <div>{TASK_TYPE_NAMES[type] || type}</div>
+          <div>{TASK_TYPE_NAMES[type] || type} #{record.user_seq || record.id}</div>
           <div style={{ fontSize: 12, color: '#94a3b8' }}>{record.created_at?.slice(5, 16)}</div>
         </div>
       ),

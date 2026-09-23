@@ -56,7 +56,8 @@ class AdapterFactory:
                 base_url=settings.MINIMAX_BASE_URL,
                 model=settings.MINIMAX_MODEL,
                 temperature=settings.MONITOR_TEMPERATURE,
-                max_tokens=settings.MONITOR_MAX_TOKENS
+                max_tokens=settings.MONITOR_MAX_TOKENS,
+                timeout=settings.MINIMAX_TIMEOUT,
             )
 
         # 豆包（火山方舟 ARK 接入）

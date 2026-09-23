@@ -17,12 +17,13 @@ class OpenAICompatibleAdapter(BaseAdapter):
     platform_code: str = "generic"  # 子类覆盖
 
     def __init__(self, api_key: str, base_url: str, model: str,
-                 temperature: float = 0.3, max_tokens: int = 2000):
+                 temperature: float = 0.3, max_tokens: int = 2000,
+                 timeout: int = 120):
         super().__init__(api_key, base_url, model, temperature, max_tokens)
         self.client = OpenAI(
             api_key=api_key,
             base_url=base_url,
-            timeout=120
+            timeout=timeout
         )
 
     def _extract_answer(self, response) -> str:

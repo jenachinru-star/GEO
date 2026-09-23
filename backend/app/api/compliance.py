@@ -57,14 +57,17 @@ PLATFORM_RULES = {
 }
 
 
-@router.post("/check", summary="发布前合规审查")
+@router.post("/check", summary="发布前合规审查（异步任务）")
 def check_compliance(
     req: ComplianceCheckRequest,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    """调用LLM检测内容是否符合目标平台的合规规则"""
+    """投递合规检查异步任务，完成后通过任务接口获取结果"""
+    from app.models.task import AsyncTask
+    import json
 
+    # 快速失败：无规则时直接返回（不投递任务）
     rules = PLATFORM_RULES.get(req.platform, [])
     if not rules:
         return {
@@ -78,7 +81,7 @@ def check_compliance(
             }
         }
 
-    # 用配置好的LLM检测
+    # 快速失败：无LLM时直接返回（不投递任务）
     adapter = adapter_factory.get_adapter("glm") or adapter_factory.get_adapter("doubao")
     if not adapter:
         return {
@@ -92,76 +95,31 @@ def check_compliance(
             }
         }
 
-    rules_text = "\n".join([f"- {r}" for r in rules])
-    prompt = f"""你是一个内容合规审查专家。请检测下面这篇医疗科普内容是否违反以下平台规则：
+    # 投递异步任务
+    task = AsyncTask(
+        task_type="compliance_check",
+        status="queued",
+        created_by=user_id,
+        payload_json=json.dumps({
+            "title": req.title,
+            "content": req.content,
+            "platform": req.platform,
+        }, ensure_ascii=False),
+        progress_message="等待执行",
+    )
+    db.add(task)
+    db.commit()
+    db.refresh(task)
 
-平台：{req.platform}
-规则：
-{rules_text}
-
-文章标题：{req.title}
-文章正文：{req.content}
-
-请按以下JSON格式返回检测结果（只返回JSON，不要其他文字）：
-{{
-  "passed": true/false,
-  "score": 0-100的分数,
-  "issues": [
-    {{
-      "level": "error" / "warning" / "info",
-      "rule": "违反的规则",
-      "message": "问题描述",
-      "suggestion": "修改建议"
-    }}
-  ]
-}}
-"""
-
-    result = adapter.query(prompt)
-    if not result.success:
-        return {
-            "code": 0,
-            "message": "success",
-            "data": {
-                "passed": True,
-                "score": 100,
-                "issues": [],
-                "message": f"LLM调用失败，跳过检测: {result.error}"
-            }
+    return {
+        "code": 0,
+        "message": "合规检查任务已提交",
+        "data": {
+            "task_id": task.id,
+            "status": "queued",
+            "message": "合规检测中，请在任务中心查看进度",
         }
-
-    # 解析LLM返回的JSON
-    import json
-    try:
-        # 提取JSON部分
-        answer = result.answer.strip()
-        if "```json" in answer:
-            answer = answer.split("```json")[1].split("```")[0].strip()
-        elif "```" in answer:
-            answer = answer.split("```")[1].split("```")[0].strip()
-
-        data = json.loads(answer)
-        return {
-            "code": 0,
-            "message": "success",
-            "data": {
-                "passed": data.get("passed", True),
-                "score": data.get("score", 100),
-                "issues": data.get("issues", []),
-                "platform": req.platform,
-            }
-        }
-    except Exception as e:
-        return {
-            "code": 0,
-            "message": "success",
-            "data": {
-                "passed": True,
-                "score": 100,
-                "issues": [],
-                "message": f"解析LLM结果失败，跳过: {str(e)}"
-            }
-        }
+    }
 
 
 @router.get("/rules/{platform}", summary="获取平台合规规则")

@@ -11,8 +11,6 @@ from app.config import settings
 APP_ROLE = os.getenv("APP_ROLE", "api")  # api / worker
 AUTO_START_WORKER = os.getenv("AUTO_START_WORKER", "true").lower() == "true"  # API模式下是否自动启动内嵌Worker
 from app.database import init_db, SessionLocal
-from app.engines.collector import CollectorEngine
-from app.models import Question
 from app.api import (
     monitor_router,
     content_router,
@@ -59,25 +57,63 @@ scheduler = BackgroundScheduler()
 
 
 def scheduled_collect():
-    """定时采集任务：每天自动采集所有启用的问题"""
+    """定时采集任务：每天自动为所有有启用语义的用户投递采集任务"""
     try:
+        import json
+        from app.models.task import AsyncTask
+        from app.models.semantic import Semantic
+        from app.models.doctor import DoctorProfile
+
         logger.info("⏰ 定时采集任务开始执行")
         db = SessionLocal()
-        collector = CollectorEngine(db)
-        questions = db.query(Question).filter(Question.status == True).all()
-        logger.info(f"待采集问题数: {len(questions)}")
 
-        success_count = 0
-        for q in questions:
+        # 查找所有有启用语义的用户（项目已迁移到Semantic表）
+        user_ids = [
+            row[0] for row in
+            db.query(Semantic.user_id).filter(
+                Semantic.is_active == True,
+                Semantic.user_id.isnot(None)
+            ).distinct().all()
+        ]
+        logger.info(f"待采集用户数: {len(user_ids)}")
+
+        task_count = 0
+        for user_id in user_ids:
             try:
-                records = collector.collect_one_question(q, detect_round=1)
-                if any(r.mentioned for r in records):
-                    success_count += 1
+                # 检查用户是否有医生资料
+                profile = db.query(DoctorProfile).filter(DoctorProfile.user_id == user_id).first()
+                if not profile:
+                    logger.warning(f"用户 [{user_id}] 无医生资料，跳过定时采集")
+                    continue
+
+                # 检查是否已有running/queued的采集任务，避免重复投递
+                existing = db.query(AsyncTask).filter(
+                    AsyncTask.created_by == user_id,
+                    AsyncTask.task_type == "geo_refresh",
+                    AsyncTask.status.in_(["queued", "running"])
+                ).first()
+                if existing:
+                    logger.info(f"用户 [{user_id}] 已有进行中的采集任务 #{existing.id}，跳过")
+                    continue
+
+                # 投递采集任务（由Worker执行，自动受益于用户平台过滤和并发采集）
+                task = AsyncTask(
+                    task_type="geo_refresh",
+                    status="queued",
+                    created_by=user_id,
+                    payload_json=json.dumps({"user_id": user_id}, ensure_ascii=False),
+                    progress_message="定时采集，等待执行",
+                )
+                db.add(task)
+                db.commit()
+                task_count += 1
+                logger.info(f"用户 [{user_id}] 定时采集任务已投递 #{task.id}")
             except Exception as e:
-                logger.error(f"采集问题 [{q.id}] 失败: {e}")
+                logger.error(f"为用户 [{user_id}] 投递定时采集任务失败: {e}")
+                db.rollback()
 
         db.close()
-        logger.info(f"✅ 定时采集任务完成，成功提及: {success_count}/{len(questions)}")
+        logger.info(f"✅ 定时采集任务完成，共投递 {task_count} 个采集任务")
     except Exception as e:
         logger.error(f"❌ 定时采集任务异常: {e}")
 

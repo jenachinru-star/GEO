@@ -70,11 +70,26 @@ class CollectorEngine:
 
         return False, last_error
 
-    def collect_one_question(self, question: Question, detect_round: int = 1) -> List[MonitorRecord]:
+    def collect_one_question(self, question: Question, detect_round: int = 1, user_id: int = None) -> List[MonitorRecord]:
         """采集单个问题在所有平台的回答（串行模式）"""
+        from app.models.user_platform_pref import UserPlatformPref
+
         records = []
         today = datetime.now().strftime("%Y-%m-%d")
         platforms = adapter_factory.get_enabled_platforms()
+
+        # 过滤用户停用的平台
+        if user_id:
+            disabled = {
+                pref.platform_code for pref in
+                self.db.query(UserPlatformPref).filter(
+                    UserPlatformPref.user_id == user_id,
+                    UserPlatformPref.enabled == False
+                ).all()
+            }
+            if disabled:
+                logger.info(f"用户 [{user_id}] 已停用平台: {disabled}，采集时跳过")
+                platforms = [p for p in platforms if p not in disabled]
 
         if not platforms:
             logger.warning("没有已启用的平台")
@@ -140,19 +155,34 @@ class CollectorEngine:
 
         return records
 
-    def collect_one_semantic(self, semantic, profile, detect_round: int = 99) -> List[MonitorRecord]:
+    def collect_one_semantic(self, semantic, profile, detect_round: int = 99, user_id: int = None) -> List[MonitorRecord]:
         """采集单个语义在所有平台的GEO/AEO数据（医生维度）
 
         Args:
             semantic: Semantic模型对象
             profile: DoctorProfile模型对象
             detect_round: 采集轮次，医生维度固定用99
+            user_id: 用户ID，用于过滤用户停用的平台
         """
         from app.engines.geo_aeo_analyzer import GEOAEOAnalyzer
+        from app.models.user_platform_pref import UserPlatformPref
 
         records = []
         today = datetime.now().strftime("%Y-%m-%d")
         platforms = adapter_factory.get_enabled_platforms()
+
+        # 过滤用户停用的平台
+        if user_id:
+            disabled = {
+                pref.platform_code for pref in
+                self.db.query(UserPlatformPref).filter(
+                    UserPlatformPref.user_id == user_id,
+                    UserPlatformPref.enabled == False
+                ).all()
+            }
+            if disabled:
+                logger.info(f"用户 [{user_id}] 已停用平台: {disabled}，采集时跳过")
+                platforms = [p for p in platforms if p not in disabled]
 
         if not platforms:
             logger.warning("没有已启用的平台")
@@ -166,11 +196,29 @@ class CollectorEngine:
             self_intro=profile.self_intro_template,
         )
 
-        logger.info(f"开始GEO/AEO采集语义 [{semantic.id}]: {semantic.question}")
+        logger.info(f"开始GEO/AEO采集语义 [{semantic.id}]: {semantic.question}（并发模式，{len(platforms)}个平台）")
 
-        for platform_code in platforms:
+        # 并发调用所有平台（仅API调用并发，LLM分析仍在主线程串行）
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        platform_results = {}  # platform_code -> (success, answer)
+
+        def _collect_platform(platform_code: str):
             logger.info(f"  -> 采集平台: {platform_code}")
             success, answer = self.query_single_platform(platform_code, semantic.question)
+            return platform_code, success, answer
+
+        with ThreadPoolExecutor(max_workers=len(platforms)) as executor:
+            futures = [executor.submit(_collect_platform, code) for code in platforms]
+            for future in as_completed(futures):
+                try:
+                    platform_code, success, answer = future.result()
+                    platform_results[platform_code] = (success, answer)
+                except Exception as e:
+                    logger.error(f"平台采集异常: {e}")
+
+        # 按平台顺序处理结果（保持记录顺序一致，LLM分析在主线程串行）
+        for platform_code in platforms:
+            success, answer = platform_results.get(platform_code, (False, "采集异常"))
 
             if success and answer:
                 result = analyzer.analyze(answer)
@@ -253,7 +301,6 @@ class CollectorEngine:
                 )
 
             records.append(record)
-            time.sleep(1)
 
         # 批量入库（先按semantic_id删旧记录，不能按question_id删！）
         if records:
@@ -305,7 +352,7 @@ class CollectorEngine:
 
         for i, semantic in enumerate(semantics):
             try:
-                records = self.collect_one_semantic(semantic, profile, detect_round)
+                records = self.collect_one_semantic(semantic, profile, detect_round, user_id=user_id)
                 all_records.extend(records)
                 success_count += 1
             except Exception as e:

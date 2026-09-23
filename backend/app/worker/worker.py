@@ -17,6 +17,7 @@ import time
 import json
 import logging
 import signal
+import threading
 import traceback
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -30,6 +31,9 @@ from app.worker.task_registry import get_handler, get_all_task_types, ProgressCa
 # 导入任务处理模块以触发注册
 import app.worker.collector_tasks  # noqa: F401
 import app.worker.asset_tasks  # noqa: F401
+import app.worker.article_tasks  # noqa: F401
+import app.worker.compliance_tasks  # noqa: F401
+import app.worker.image_tasks  # noqa: F401
 
 logging.basicConfig(
     level=logging.INFO,
@@ -46,13 +50,18 @@ class TaskCancelledError(Exception):
 # 全局运行标志
 _running = True
 POLL_INTERVAL = 3  # 轮询间隔（秒）
+_last_executed_user = None  # 上一次执行任务的用户ID，用于轮询调度
+_last_user_lock = threading.Lock()  # 保护 _last_executed_user 的多线程读写
 
 # 任务超时时间（按任务类型），全量采集需要更长时间
 TASK_TIMEOUT_BY_TYPE = {
-    "geo_refresh": 3600,      # GEO全量采集：1小时（19语义×4平台串行约36分钟）
+    "geo_refresh": 3600,      # GEO全量采集：1小时（19语义×4平台并发约15分钟）
     "monitor_collect": 1800,  # 品牌监测采集：30分钟
     "asset_url_collect": 600, # 资产URL采集：10分钟
     "asset_file_parse": 300,  # 资产文件解析：5分钟
+    "article_generate": 600,  # 文章生成：最多120秒，600秒留5倍余量
+    "compliance_check": 300,  # 合规检查：5-30秒
+    "image_generate": 300,    # 生图：5-30秒
 }
 TASK_TIMEOUT_DEFAULT = 600  # 默认超时时间
 CANCEL_GRACE_SECONDS = 300  # cancelling状态宽限期：超过此时间仍未终止则强制failed
@@ -111,20 +120,36 @@ def signal_handler(signum, frame):
 
 
 def claim_next_task(db: Session) -> AsyncTask | None:
-    """认领下一个 queued 任务（原子UPDATE，多线程安全）"""
-    # 先查候选任务
-    task = db.query(AsyncTask).filter(
-        AsyncTask.status == "queued"
-    ).order_by(AsyncTask.created_at.asc()).first()
+    """认领下一个 queued 任务（按用户轮询调度，多线程安全）"""
+    global _last_executed_user
 
-    if not task:
+    # 先查所有 queued 任务，按创建时间排序
+    queued_tasks = db.query(AsyncTask).filter(
+        AsyncTask.status == "queued"
+    ).order_by(AsyncTask.created_at.asc()).all()
+
+    if not queued_tasks:
         return None
+
+    # 按用户轮询：优先选择与上一次执行用户不同的任务
+    selected_task = None
+    with _last_user_lock:
+        prev_user = _last_executed_user
+    if prev_user is not None:
+        # 找第一个不是上一次用户的任务
+        for t in queued_tasks:
+            if t.created_by != prev_user:
+                selected_task = t
+                break
+    # 如果所有任务都是上一次用户的，或者没有上一次用户记录，选最早的
+    if selected_task is None:
+        selected_task = queued_tasks[0]
 
     # 用原子UPDATE认领：只有status仍是queued时才更新成功
     from sqlalchemy import update as sa_update
     result = db.execute(
         sa_update(AsyncTask)
-        .where(AsyncTask.id == task.id, AsyncTask.status == "queued")
+        .where(AsyncTask.id == selected_task.id, AsyncTask.status == "queued")
         .values(
             status="running",
             started_at=datetime.now(),
@@ -137,20 +162,24 @@ def claim_next_task(db: Session) -> AsyncTask | None:
         # 被其他线程认领了
         return None
 
-    db.refresh(task)
+    db.refresh(selected_task)
+
+    # 记录上一次执行的用户，用于轮询（加锁保护）
+    with _last_user_lock:
+        _last_executed_user = selected_task.created_by
 
     # 排队超时检查：任务在队列中等待过久（超过该任务类型超时的2倍），直接标记failed不执行
-    queue_timeout = get_task_timeout(task.task_type) * 2
-    if task.created_at and (datetime.utcnow() - task.created_at).total_seconds() > queue_timeout:
-        logger.warning(f"任务 #{task.id} 排队超时（created_at={task.created_at}, 阈值={queue_timeout}s），标记为failed")
-        task.status = "failed"
-        task.error_message = "任务排队超时"
-        task.finished_at = datetime.utcnow()
+    queue_timeout = get_task_timeout(selected_task.task_type) * 2
+    if selected_task.created_at and (datetime.utcnow() - selected_task.created_at).total_seconds() > queue_timeout:
+        logger.warning(f"任务 #{selected_task.id} 排队超时（created_at={selected_task.created_at}, 阈值={queue_timeout}s），标记为failed")
+        selected_task.status = "failed"
+        selected_task.error_message = "任务排队超时"
+        selected_task.finished_at = datetime.utcnow()
         db.commit()
         return None
 
-    logger.info(f"认领任务 #{task.id} (type={task.task_type})")
-    return task
+    logger.info(f"认领任务 #{selected_task.id} (type={selected_task.task_type}, user={selected_task.created_by})")
+    return selected_task
 
 
 def execute_task(db: Session, task: AsyncTask, on_progress: ProgressCallback = None):

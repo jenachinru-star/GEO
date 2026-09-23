@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from 'react'
+﻿import { useEffect, useState, useRef } from 'react'
 import {
   Row, Col, Button, Select, Modal, Form, Input,
   message, Space, Tag, Empty, Typography, Table,
@@ -10,7 +10,7 @@ import {
   DeleteOutlined, EyeOutlined, EditOutlined,
   ThunderboltOutlined, BlockOutlined
 } from '@ant-design/icons'
-import { semanticApi, articleApi, toolsApi, templateApi, distributionApi, opportunityApi } from '@/api'
+import { semanticApi, articleApi, toolsApi, templateApi, distributionApi, opportunityApi, taskApi } from '@/api'
 import { PUBLISH_PLATFORMS, PUBLISH_PLATFORM_NAMES, ARTICLE_STATUS_NAMES } from '@/store/useStore'
 import { formatUtcDate } from '@/utils/time'
 
@@ -60,6 +60,9 @@ const ContentHub = () => {
   const [oppScanning, setOppScanning] = useState(false)
   const [activeTab, setActiveTab] = useState('create')
 
+  // 文章生成异步轮询定时器
+  const articlePollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
   // ========== 数据加载 ==========
   const loadSemantics = async () => {
     try {
@@ -108,6 +111,42 @@ const ContentHub = () => {
     loadData()
   }, [filters, page])
 
+  // 组件卸载时清除文章生成轮询定时器
+  useEffect(() => {
+    return () => {
+      if (articlePollTimerRef.current) {
+        clearInterval(articlePollTimerRef.current)
+        articlePollTimerRef.current = null
+      }
+    }
+  }, [])
+
+  // 文章生成异步任务轮询（每3秒查询任务状态）
+  const pollArticleTask = (taskId: number, onSuccess: (data: any) => void) => {
+    if (articlePollTimerRef.current) {
+      clearInterval(articlePollTimerRef.current)
+    }
+    articlePollTimerRef.current = setInterval(async () => {
+      try {
+        const taskRes: any = await taskApi.get(taskId)
+        const task = taskRes.data
+        if (task.status === 'succeeded') {
+          if (articlePollTimerRef.current) clearInterval(articlePollTimerRef.current)
+          articlePollTimerRef.current = null
+          setTemplateLoading(false)
+          onSuccess(task.result)
+        } else if (task.status === 'failed') {
+          if (articlePollTimerRef.current) clearInterval(articlePollTimerRef.current)
+          articlePollTimerRef.current = null
+          setTemplateLoading(false)
+          message.error(task.error_message || '文章生成失败')
+        }
+      } catch (e) {
+        // 轮询出错不中断，继续下一次
+      }
+    }, 3000)
+  }
+
   // ========== 创作工作台函数（来自 Create.tsx）==========
   const handleGenerateArticle = () => {
     if (!selectedSemantic) {
@@ -146,8 +185,13 @@ const ContentHub = () => {
     setTemplateLoading(true)
     try {
       const res: any = await templateApi.generateArticle(selectedSemantic)
-      setTemplateData(res.data)
-    } finally {
+      const taskId = res.data.task_id
+      message.info('文章生成任务已提交，正在生成中...')
+      pollArticleTask(taskId, (articleData) => {
+        setTemplateData(articleData)
+        message.success('文章生成完成')
+      })
+    } catch (e) {
       setTemplateLoading(false)
     }
   }
@@ -328,16 +372,20 @@ const ContentHub = () => {
   }
 
   const handleGenerateFromOpportunity = async (opp: any) => {
-    // 选中对应语义并生成文章模板
+    // 选中对应语义并生成文章模板（异步任务）
     setSelectedSemantic(opp.question_id)
     setTemplateLoading(true)
     try {
       const res: any = await templateApi.generateArticle(opp.question_id, opp.id)
-      setTemplateData(res.data)
-      message.success(`已基于内容机会生成文章（来源：${res.data.source === 'llm' ? 'LLM' : '模板'}）`)
+      const taskId = res.data.task_id
+      message.info('文章生成任务已提交，正在生成中...')
       // 切换到内容创作Tab
       setActiveTab('create')
-    } catch (e) {} finally {
+      pollArticleTask(taskId, (articleData) => {
+        setTemplateData(articleData)
+        message.success(`已基于内容机会生成文章（来源：${articleData.source === 'llm' ? 'LLM' : '模板'}）`)
+      })
+    } catch (e) {
       setTemplateLoading(false)
     }
   }

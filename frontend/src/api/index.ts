@@ -251,7 +251,7 @@ export const entityApi = {
 // ============ 文章模板 API ============
 export const templateApi = {
   generateArticle: (semanticId: number, opportunityId?: number) =>
-    request.get(`/template/article/${semanticId}`, { params: opportunityId ? { opportunity_id: opportunityId } : {} }),
+    request.post(`/template/article/${semanticId}`, null, { params: opportunityId ? { opportunity_id: opportunityId } : {} }),
   generateLlms: () => request.get('/template/llms.txt', { responseType: 'text' }),
 }
 

@@ -18,13 +18,17 @@ class GenerateImageRequest(BaseModel):
     style: Optional[str] = Field(None, description="风格参数")
 
 
-@router.post("/generate", summary="生成图片")
+@router.post("/generate", summary="生成图片（异步任务）")
 def generate_image(
     req: GenerateImageRequest,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id)
 ):
-    """生成图片（未配置时返回 400）"""
+    """投递生图异步任务，完成后通过任务接口获取结果"""
+    from app.models.task import AsyncTask
+    import json
+
+    # 快速失败：未配置时直接返回（不投递任务）
     if not adapter_factory.is_image_configured():
         raise HTTPException(
             status_code=400,
@@ -35,26 +39,31 @@ def generate_image(
     if not image_adapter:
         raise HTTPException(status_code=400, detail="生图适配器不可用")
 
-    result = image_adapter.generate(
-        prompt=req.prompt,
-        width=req.width,
-        height=req.height,
-        n=req.n,
-        style=req.style,
+    # 投递异步任务
+    task = AsyncTask(
+        task_type="image_generate",
+        status="queued",
+        created_by=user_id,
+        payload_json=json.dumps({
+            "prompt": req.prompt,
+            "width": req.width,
+            "height": req.height,
+            "n": req.n,
+            "style": req.style,
+        }, ensure_ascii=False),
+        progress_message="等待执行",
     )
-
-    if not result.success:
-        raise HTTPException(status_code=500, detail=result.error_message or "生图失败")
+    db.add(task)
+    db.commit()
+    db.refresh(task)
 
     return {
         "code": 0,
-        "message": "success",
+        "message": "生图任务已提交",
         "data": {
-            "image_urls": result.image_urls,
-            "task_id": result.task_id,
-            "status": result.status,
-            "width": result.width,
-            "height": result.height,
+            "task_id": task.id,
+            "status": "queued",
+            "message": "生图中，请在任务中心查看进度",
         }
     }
 

@@ -32,8 +32,15 @@ def get_task(
         except:
             pass
 
+    # 计算用户级序号（比该任务id小的同用户任务数 + 1，id全局自增保证顺序唯一）
+    user_seq = db.query(AsyncTask).filter(
+        AsyncTask.created_by == user_id,
+        AsyncTask.id < task.id
+    ).count() + 1
+
     return {"code": 0, "message": "success", "data": {
         "id": task.id,
+        "user_seq": user_seq,
         "task_type": task.task_type,
         "status": task.status,
         "progress": task.progress,
@@ -65,12 +72,16 @@ def list_tasks(
     items = query.order_by(AsyncTask.created_at.desc())\
         .offset((page - 1) * page_size).limit(page_size).all()
 
-    return {"code": 0, "message": "success", "data": {
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "items": [{
+    # 批量计算每个任务的用户级序号（比该任务id小的同用户任务数 + 1）
+    item_data = []
+    for t in items:
+        user_seq = db.query(AsyncTask).filter(
+            AsyncTask.created_by == user_id,
+            AsyncTask.id < t.id
+        ).count() + 1
+        item_data.append({
             "id": t.id,
+            "user_seq": user_seq,
             "task_type": t.task_type,
             "status": t.status,
             "progress": t.progress,
@@ -79,7 +90,13 @@ def list_tasks(
             "created_at": t.created_at.isoformat() if t.created_at else None,
             "started_at": t.started_at.isoformat() if t.started_at else None,
             "finished_at": t.finished_at.isoformat() if t.finished_at else None,
-        } for t in items]
+        })
+
+    return {"code": 0, "message": "success", "data": {
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "items": item_data
     }}
 
 
