@@ -467,7 +467,32 @@ def get_my_by_platform(
         LlmUsageLog.user_id == current_user_id,
     ).group_by(LlmUsageLog.platform, LlmUsageLog.model).all()
 
-    result = [{"platform": r.platform, "model": r.model, "tokens": int(r.tokens or 0), "cost": float(r.cost or 0), "calls": int(r.calls or 0)} for r in rows]
+    result = []
+    for r in rows:
+        calls = int(r.calls or 0)
+        # 在Python里计算成功率和平均耗时（避免SQLite聚合兼容性问题）
+        success_count = db.query(func.count(LlmUsageLog.id)).filter(
+            LlmUsageLog.created_at >= start_date,
+            LlmUsageLog.user_id == current_user_id,
+            LlmUsageLog.platform == r.platform,
+            LlmUsageLog.model == r.model,
+            LlmUsageLog.success == True,
+        ).scalar() or 0
+        total_latency = db.query(func.coalesce(func.sum(LlmUsageLog.latency_ms), 0)).filter(
+            LlmUsageLog.created_at >= start_date,
+            LlmUsageLog.user_id == current_user_id,
+            LlmUsageLog.platform == r.platform,
+            LlmUsageLog.model == r.model,
+        ).scalar() or 0
+        result.append({
+            "platform": r.platform,
+            "model": r.model,
+            "tokens": int(r.tokens or 0),
+            "cost": float(r.cost or 0),
+            "calls": calls,
+            "success_rate": round(success_count / calls * 100, 1) if calls > 0 else 0,
+            "avg_latency_ms": round(float(total_latency) / calls, 0) if calls > 0 else 0,
+        })
     return {"code": 0, "message": "success", "data": result}
 
 
@@ -476,6 +501,8 @@ def get_my_logs(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     days: int = Query(7, ge=1, le=90),
+    platform: Optional[str] = Query(None),
+    task_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id),
 ):
@@ -486,6 +513,11 @@ def get_my_logs(
         LlmUsageLog.created_at >= start_date,
         LlmUsageLog.user_id == current_user_id,
     )
+
+    if platform:
+        query = query.filter(LlmUsageLog.platform == platform)
+    if task_type:
+        query = query.filter(LlmUsageLog.task_type == task_type)
 
     total = query.count()
     items = query.order_by(LlmUsageLog.created_at.desc()) \

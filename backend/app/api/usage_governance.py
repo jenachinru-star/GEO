@@ -1,5 +1,5 @@
 """用量治理 API — 用户平台开关 + 配额管理 + 用量报表"""
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from datetime import datetime
@@ -106,30 +106,42 @@ def update_my_pref(
 
 @router.get("/quota/my", summary="获取我的配额和当月用量")
 def get_my_quota(
+    target_user_id: Optional[int] = Query(None, description="管理员可指定查看的用户ID"),
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    """当前用户的配额 + 当月费用 + 各平台用量明细"""
-    quota = ensure_user_quota(db, user_id)
-    used = get_monthly_cost(db, user_id)
+    """当前用户的配额 + 当月费用 + 各平台用量明细
+    管理员可传 target_user_id 查看指定用户的用量；普通用户忽略该参数。
+    """
     is_admin = _is_admin(db, user_id)
 
-    # 管理员不限额
-    if is_admin:
+    # 管理员可切换查看目标用户，普通用户只能看自己
+    view_user_id = user_id
+    if is_admin and target_user_id and target_user_id != user_id:
+        target_user = db.query(User).filter(User.id == target_user_id).first()
+        if not target_user:
+            raise HTTPException(status_code=404, detail="目标用户不存在")
+        view_user_id = target_user_id
+
+    quota = ensure_user_quota(db, view_user_id)
+    used = get_monthly_cost(db, view_user_id)
+
+    # 管理员查看自己时不限额，查看其他用户时显示该用户的配额
+    if is_admin and view_user_id == user_id:
         limit = -1
         pct = 0
     else:
         limit = quota.monthly_cost_limit
         pct = round(used / limit * 100, 1) if limit and limit > 0 else 0
 
-    # 各平台当月用量
+    # 各平台当月用量（按view_user_id统计）
     month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
     rows = db.query(
         LlmUsageLog.platform,
         func.sum(LlmUsageLog.total_tokens).label("tokens"),
         func.sum(LlmUsageLog.estimated_cost).label("cost"),
     ).filter(
-        LlmUsageLog.user_id == user_id,
+        LlmUsageLog.user_id == view_user_id,
         LlmUsageLog.created_at >= month_start,
     ).group_by(LlmUsageLog.platform).all()
 
@@ -139,6 +151,13 @@ def get_my_quota(
         "cost": round(float(r.cost or 0), 4),
     } for r in rows]
 
+    # 获取目标用户信息（用于前端显示）
+    target_user_info = None
+    if view_user_id != user_id:
+        tu = db.query(User).filter(User.id == view_user_id).first()
+        if tu:
+            target_user_info = {"user_id": tu.id, "username": tu.username, "email": tu.email or ""}
+
     return {"code": 0, "message": "success", "data": {
         "monthly_limit": limit,
         "used_cost": round(used, 4),
@@ -146,6 +165,8 @@ def get_my_quota(
         "warn_threshold": quota.warn_threshold,
         "is_admin": is_admin,
         "by_platform": by_platform,
+        "view_user_id": view_user_id,
+        "target_user": target_user_info,
     }}
 
 
