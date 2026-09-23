@@ -194,6 +194,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# API速率限制中间件（每IP每分钟120次请求）
+from app.middleware.rate_limit import RateLimitMiddleware
+app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
+
 
 # usage_context中间件：HTTP请求自动设置user_id，使LLM调用能进行配额检查
 @app.middleware("http")
@@ -293,7 +297,7 @@ if __name__ == "__main__":
             "app.main:app",
             host=settings.HOST,
             port=settings.PORT,
-            reload=settings.DEBUG
+            reload=settings.is_debug
         )
 
 

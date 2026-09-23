@@ -34,6 +34,7 @@ import app.worker.asset_tasks  # noqa: F401
 import app.worker.article_tasks  # noqa: F401
 import app.worker.compliance_tasks  # noqa: F401
 import app.worker.image_tasks  # noqa: F401
+import app.worker.export_tasks  # noqa: F401
 
 logging.basicConfig(
     level=logging.INFO,

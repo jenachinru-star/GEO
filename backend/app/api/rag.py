@@ -11,9 +11,16 @@ router = APIRouter(prefix="/api/v1/rag", tags=["智能问答"])
 
 @router.post("/query", summary="基于知识库的智能问答（支持多轮对话）")
 def rag_query(data: RAGQuery, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    from app.models.user import User
+    from app.utils.level_guard import get_effective_level
+
+    user = db.query(User).filter(User.id == user_id).first()
+    is_admin = user and user.role == "admin"
+    effective_level = get_effective_level(data.level, is_admin)
+
     rag = RAGEngine(db)
     history = [h.model_dump() for h in data.history] if data.history else []
-    result = rag.generate_answer(data.query, data.platform, data.level, history)
+    result = rag.generate_answer(data.query, data.platform, effective_level, history)
     return {"code": 0, "message": "success", "data": result}
 
 

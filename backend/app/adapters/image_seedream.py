@@ -22,6 +22,7 @@ class SeedreamImageAdapter(BaseImageAdapter):
             api_key=api_key,
             base_url=base_url,
             timeout=120,
+            max_retries=2,
         )
 
     def generate(self, prompt: str, **kwargs) -> ImageResult:

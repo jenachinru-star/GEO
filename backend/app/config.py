@@ -10,7 +10,7 @@ class Settings(BaseSettings):
     # 应用配置
     APP_NAME: str = "GEO Monitor"
     APP_ENV: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     SECRET_KEY: str = "geo-monitor-secret-key"
@@ -100,6 +100,11 @@ class Settings(BaseSettings):
     # Resend 邮件服务
     RESEND_API_KEY: str = ""
     RESEND_FROM_EMAIL: str = ""
+
+    @property
+    def is_debug(self) -> bool:
+        """根据APP_ENV决定是否开启调试模式（development=True，production=False）"""
+        return self.APP_ENV == "development"
 
     @property
     def iam_enabled(self) -> bool:

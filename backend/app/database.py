@@ -15,8 +15,20 @@ if settings.DATABASE_URL.startswith("sqlite"):
 engine = create_engine(
     settings.DATABASE_URL,
     connect_args=connect_args,
-    echo=settings.DEBUG
+    echo=settings.is_debug,
+    pool_pre_ping=True,
 )
+
+# 开启WAL模式（SQLite并发性能优化：读写不互斥）
+if settings.DATABASE_URL.startswith("sqlite"):
+    from sqlalchemy import event
+    @event.listens_for(engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")  # WAL模式下可降低同步级别，性能更好
+        cursor.execute("PRAGMA busy_timeout=5000")  # 锁等待超时5秒，避免database is locked
+        cursor.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
@@ -35,6 +47,7 @@ def init_db():
     """初始化数据库表"""
     from app.models import platform, question, monitor, content, knowledge, competitor, user, doctor, semantic, article, subscription, distribution
     from app.models import asset  # 数字资产模块
+    from app.models import video_task  # 视频生成任务
     Base.metadata.create_all(bind=engine)
     # 迁移：geo_monitor_record 加 GEO/AEO 字段
     with engine.connect() as conn:

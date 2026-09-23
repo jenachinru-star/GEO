@@ -37,15 +37,18 @@ logger = logging.getLogger(__name__)
 class UsageLogger:
     """LLM 用量异步日志记录器"""
 
-    def __init__(self, batch_size: int = 100, flush_interval: float = 1.0):
+    def __init__(self, batch_size: int = 100, flush_interval: float = 1.0, max_queue_size: int = 10000):
         """
         Args:
             batch_size: 批量写入的最大条数
             flush_interval: 定时刷新间隔（秒）
+            max_queue_size: 队列最大长度，满时丢弃最旧记录（防止OOM）
         """
-        self._queue: queue.Queue = queue.Queue()
+        self._queue: queue.Queue = queue.Queue(maxsize=max_queue_size)
         self._batch_size = batch_size
         self._flush_interval = flush_interval
+        self._max_queue_size = max_queue_size
+        self._dropped_count = 0  # 丢弃计数
         self._running = False
         self._worker_thread: Optional[threading.Thread] = None
         self._lock = threading.Lock()
@@ -107,21 +110,26 @@ class UsageLogger:
             logger.debug("LLM 用量记录器未启动，丢弃日志: %s", kwargs.get("task_type", "unknown"))
             return
 
-        # 计算估算成本
-        estimated_cost = self._calc_cost(
-            kwargs.get("platform", ""),
-            kwargs.get("model", ""),
-            kwargs.get("prompt_tokens", 0),
-            kwargs.get("completion_tokens", 0),
-        )
-        kwargs["estimated_cost"] = estimated_cost
+        # 计算估算成本（如果调用方已显式传入 estimated_cost 则优先使用）
+        if "estimated_cost" not in kwargs:
+            estimated_cost = self._calc_cost(
+                kwargs.get("platform", ""),
+                kwargs.get("model", ""),
+                kwargs.get("prompt_tokens", 0),
+                kwargs.get("completion_tokens", 0),
+            )
+            kwargs["estimated_cost"] = estimated_cost
         # 显式记录调用时间（本地时间，避免 SQLite func.now() 返回 UTC）
         kwargs["created_at"] = datetime.now()
 
         try:
             self._queue.put_nowait(kwargs)
         except queue.Full:
-            logger.warning("LLM 用量日志队列已满，丢弃一条记录")
+            self._dropped_count += 1
+            # 每100条打一次warning，避免日志洪水
+            if self._dropped_count % 100 == 0:
+                logger.warning("用量日志队列已满（maxsize=%d），已丢弃 %d 条记录",
+                               self._max_queue_size, self._dropped_count)
 
     def flush(self):
         """立即将队列中所有数据写入数据库（阻塞）"""

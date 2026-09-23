@@ -11,9 +11,11 @@
 导出内容：总结 + 原文摘要 + 笔记
 """
 import logging
+import json
+import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import Response
+from fastapi.responses import Response, FileResponse
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel
@@ -21,6 +23,7 @@ from pydantic import BaseModel
 from app.database import get_db
 from app.deps import get_current_user_id
 from app.models.asset import AssetDocument, AssetNote
+from app.models.task import AsyncTask
 
 logger = logging.getLogger(__name__)
 
@@ -89,9 +92,13 @@ def build_markdown_content(doc: AssetDocument, notes: list) -> str:
 
 
 def markdown_to_html(md_content: str, title: str) -> str:
-    """简单的Markdown转HTML（带样式）"""
-    # 简单的Markdown→HTML转换，不引入完整库，够用就行
+    """简单的Markdown转HTML（带样式，用户内容已转义防XSS）"""
     import re
+    import html as html_mod
+
+    # 先对用户内容做HTML转义（防止存储型XSS），Markdown语法字符(#, *)不受影响
+    md_content = html_mod.escape(md_content)
+    title = html_mod.escape(title)
 
     html = md_content
 
@@ -177,6 +184,17 @@ def export_document(
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
 
+    # 配额检查（按月费用上限）
+    from app.services.quota_checker import check_quota, QuotaError
+    try:
+        check_quota(db, user_id)
+    except QuotaError as e:
+        raise HTTPException(status_code=402, detail=f"配额不足: {e.message}")
+
+    # 文档大小限制（防止超大文档导出超时，上限20万字）
+    if doc.content and len(doc.content) > 200000:
+        raise HTTPException(status_code=400, detail="文档过大（超过20万字），请拆分后导出")
+
     # 获取笔记
     notes = db.query(AssetNote).filter(
         AssetNote.document_id == doc.id,
@@ -205,21 +223,24 @@ def export_document(
         )
 
     elif req.format == "pdf":
-        # PDF导出：尝试用WeasyPrint，如果没装就降级到HTML下载
-        try:
-            from weasyprint import HTML
-            html_content = markdown_to_html(md_content, doc.title)
-            pdf_bytes = HTML(string=html_content).write_pdf()
-            return Response(
-                content=pdf_bytes,
-                media_type="application/pdf",
-                headers={"Content-Disposition": f"attachment; filename*=UTF-8''{filename}.pdf"}
-            )
-        except ImportError:
-            raise HTTPException(
-                status_code=501,
-                detail="PDF导出功能未配置，请先安装weasyprint，或使用HTML格式导出后浏览器打印为PDF"
-            )
+        # PDF导出：投递异步任务，由Worker执行weasyprint（避免阻塞HTTP请求）
+        task = AsyncTask(
+            task_type="asset_export",
+            status="queued",
+            created_by=user_id,
+            payload_json=json.dumps({
+                "document_id": req.document_id,
+                "format": "pdf",
+                "include_summary": req.include_summary,
+                "include_notes": req.include_notes,
+                "include_abstract": req.include_abstract,
+            }, ensure_ascii=False),
+            progress_message="PDF导出等待执行",
+        )
+        db.add(task)
+        db.commit()
+        db.refresh(task)
+        return {"code": 0, "message": "PDF导出任务已提交", "data": {"task_id": task.id, "status": "queued"}}
 
     elif req.format == "mindmap":
         # 思维导图：Markmap格式（用Markdown层级结构生成思维导图）
@@ -386,3 +407,13 @@ def preview_export(
             "title": doc.title,
         }
     }
+
+
+@router.get("/download/{filename}", summary="下载导出文件")
+def download_export(filename: str, user_id: int = Depends(get_current_user_id)):
+    """下载异步导出生成的文件"""
+    export_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "..", "data", "exports")
+    filepath = os.path.join(export_dir, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="导出文件不存在")
+    return FileResponse(filepath, filename=filename)

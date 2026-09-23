@@ -77,8 +77,16 @@ def delete_knowledge(knowledge_id: int, db: Session = Depends(get_db), user_id: 
 
 @router.post("/search", summary="语义检索知识库")
 def search_knowledge(query: str, level: str = "public", top_k: int = 5, db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
+    from app.models.user import User
+    from app.utils.level_guard import get_effective_level
+
+    # 按用户角色计算实际可访问的level上限
+    user = db.query(User).filter(User.id == user_id).first()
+    is_admin = user and user.role == "admin"
+    effective_level = get_effective_level(level, is_admin)
+
     rag = RAGEngine(db)
-    results = rag.search_knowledge(query, top_k=top_k, level=level)
+    results = rag.search_knowledge(query, top_k=top_k, level=effective_level)
     return {"code": 0, "message": "success", "data": [
         {"id": k.id, "title": k.title, "content": k.content, "score": float(score), "category": k.category}
         for k, score in results
