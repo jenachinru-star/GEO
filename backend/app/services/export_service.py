@@ -437,3 +437,75 @@ class ExportService:
         output = io.BytesIO()
         wb.save(output)
         return output.getvalue()
+
+    @staticmethod
+    def export_wechat_articles(db: Session, account, articles: list) -> bytes:
+        """导出微信公众号文章列表为Excel（阶段四B）
+
+        Args:
+            db: 数据库会话
+            account: PublishAccount对象
+            articles: WechatArticle列表
+
+        Returns:
+            bytes: Excel文件二进制数据
+        """
+        from app.models.wechat_stats import WechatArticleStats
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "文章数据"
+
+        # 表头
+        headers = ["序号", "文章标题", "发布日期", "阅读量", "阅读人数",
+                   "点赞", "分享", "收藏", "点赞率", "分享率"]
+        for col, header in enumerate(headers, 1):
+            ws.cell(row=1, column=col, value=header)
+        ExportService._style_header(ws, 1, len(headers))
+
+        # 数据行
+        for row_idx, article in enumerate(articles, 2):
+            # 最新数据快照（day_0）
+            stats = db.query(WechatArticleStats).filter(
+                WechatArticleStats.article_id == article.id,
+                WechatArticleStats.snapshot_day == 0,
+            ).first()
+
+            reads = stats.int_page_read_count if stats else 0
+            read_users = stats.int_page_read_user if stats else 0
+            likes = stats.like_count if stats else 0
+            shares = stats.share_count if stats else 0
+            favorites = stats.add_to_fav_count if stats else 0
+            like_rate = f"{(likes / reads * 100):.2f}%" if reads > 0 else "0%"
+            share_rate = f"{(shares / reads * 100):.2f}%" if reads > 0 else "0%"
+
+            ws.cell(row=row_idx, column=1, value=row_idx - 1)
+            ws.cell(row=row_idx, column=2, value=article.title)
+            ws.cell(row=row_idx, column=3,
+                    value=article.publish_date.isoformat() if article.publish_date else "")
+            ws.cell(row=row_idx, column=4, value=reads)
+            ws.cell(row=row_idx, column=5, value=read_users)
+            ws.cell(row=row_idx, column=6, value=likes)
+            ws.cell(row=row_idx, column=7, value=shares)
+            ws.cell(row=row_idx, column=8, value=favorites)
+            ws.cell(row=row_idx, column=9, value=like_rate)
+            ws.cell(row=row_idx, column=10, value=share_rate)
+
+        # 边框 + 对齐（数据行；无数据时至少保证表头行不受影响）
+        if articles:
+            ExportService._style_data(ws, 2, len(articles) + 1, len(headers))
+
+        # 列宽
+        col_widths = {
+            'A': 6, 'B': 50, 'C': 12, 'D': 10, 'E': 10,
+            'F': 8, 'G': 8, 'H': 8, 'I': 10, 'J': 10,
+        }
+        for col_letter, width in col_widths.items():
+            ws.column_dimensions[col_letter].width = width
+
+        ws.freeze_panes = "A2"
+
+        output = io.BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output.getvalue()

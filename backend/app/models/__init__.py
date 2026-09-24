@@ -39,6 +39,9 @@ from app.models.user_quota import UserQuota
 # ===== 微信公众号数据统计模块 =====
 from app.models.wechat_stats import WechatAccountStats, WechatArticle, WechatArticleStats
 
+# ===== 文章AI分析模块 =====
+from app.models.article_analysis import ArticleAnalysis
+
 __all__ = [
     "Platform",
     "Question",
@@ -76,4 +79,6 @@ __all__ = [
     "WechatAccountStats",
     "WechatArticle",
     "WechatArticleStats",
+    # 文章AI分析模块
+    "ArticleAnalysis",
 ]

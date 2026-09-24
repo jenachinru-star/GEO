@@ -54,6 +54,7 @@ class WechatArticle(Base):
     digest = Column(String(500), default="")        # 摘要
     publish_date = Column(Date, nullable=True, index=True)  # 发布日期
     media_id = Column(String(100), default="")      # 微信素材media_id
+    content = Column(Text, default="")              # 文章正文（通过本系统发布时同步存储，供AI分析）
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

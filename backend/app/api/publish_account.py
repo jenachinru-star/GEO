@@ -9,6 +9,7 @@ from app.database import get_db
 from app.deps import get_current_user_id
 from app.models.publish_account import PublishAccount
 from app.models.wechat_stats import WechatAccountStats, WechatArticle, WechatArticleStats
+from app.models.article_analysis import ArticleAnalysis
 from app.models.task import AsyncTask
 from app.services.wechat_data_service import WechatDataService
 from app.utils.crypto import encrypt, decrypt
@@ -388,3 +389,222 @@ def collect_account_stats(
     db.commit()
 
     return {"code": 0, "message": "采集任务已提交", "data": {"task_id": task.id}}
+
+
+# ===== 阶段四B：文章详情 / AI分析 / 导出 =====
+# 注意：articles/export 必须声明在 articles/{article_id} 之前，
+# 否则 "export" 会被当作 article_id 匹配，int 校验失败返回422。
+
+
+@router.get("/{account_id}/articles/export", summary="导出文章列表Excel")
+def export_articles(
+    account_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """导出账号文章列表为Excel"""
+    import io
+    from urllib.parse import quote
+    from fastapi.responses import StreamingResponse
+    from app.services.export_service import ExportService
+
+    account = db.query(PublishAccount).filter(
+        PublishAccount.id == account_id,
+        PublishAccount.user_id == user_id
+    ).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="账号不存在")
+
+    # 获取所有文章
+    articles = db.query(WechatArticle).filter(
+        WechatArticle.account_id == account_id,
+    ).order_by(WechatArticle.publish_date.desc()).all()
+
+    # 生成Excel
+    output = ExportService.export_wechat_articles(db, account, articles)
+
+    filename = f"公众号文章数据_{account.account_name}_{datetime.now().strftime('%Y%m%d')}.xlsx"
+    headers = {
+        # 中文文件名需URL编码
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+    }
+    return StreamingResponse(
+        io.BytesIO(output),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers=headers,
+    )
+
+
+@router.get("/{account_id}/articles/{article_id}", summary="文章详情")
+def get_article_detail(
+    account_id: int,
+    article_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """获取文章详情（含多时间点数据快照）"""
+    account = db.query(PublishAccount).filter(
+        PublishAccount.id == account_id,
+        PublishAccount.user_id == user_id
+    ).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="账号不存在")
+
+    article = db.query(WechatArticle).filter(
+        WechatArticle.id == article_id,
+        WechatArticle.account_id == account_id,
+    ).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="文章不存在")
+
+    # 获取所有时间点快照，按 snapshot_day 升序
+    snapshots = db.query(WechatArticleStats).filter(
+        WechatArticleStats.article_id == article_id,
+    ).order_by(WechatArticleStats.snapshot_day.asc()).all()
+
+    snapshot_data = {}
+    for s in snapshots:
+        snapshot_data[f"day_{s.snapshot_day}"] = {
+            "snapshot_day": s.snapshot_day,
+            "stat_date": s.stat_date.isoformat(),
+            "int_page_read_count": s.int_page_read_count,
+            "int_page_read_user": s.int_page_read_user,
+            "share_count": s.share_count,
+            "like_count": s.like_count,
+            "add_to_fav_count": s.add_to_fav_count,
+        }
+
+    # 获取最新分析结果（仅状态与时间，详情走 analysis 接口）
+    latest_analysis = db.query(ArticleAnalysis).filter(
+        ArticleAnalysis.article_id == article_id,
+        ArticleAnalysis.analysis_type == "full",
+    ).order_by(ArticleAnalysis.created_at.desc()).first()
+
+    return {"code": 0, "message": "success", "data": {
+        "id": article.id,
+        "title": article.title,
+        "article_url": article.article_url,
+        "cover_url": article.cover_url,
+        "author": article.author,
+        "digest": article.digest,
+        "publish_date": article.publish_date.isoformat() if article.publish_date else None,
+        "has_content": bool(article.content),
+        "snapshots": snapshot_data,
+        "latest_analysis": {
+            "status": latest_analysis.status,
+            "created_at": latest_analysis.created_at.isoformat()
+            if latest_analysis and latest_analysis.created_at else None,
+        } if latest_analysis else None,
+    }}
+
+
+@router.post("/{account_id}/articles/{article_id}/analyze", summary="提交文章AI分析")
+def submit_article_analysis(
+    account_id: int,
+    article_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """提交文章AI分析任务（异步）"""
+    account = db.query(PublishAccount).filter(
+        PublishAccount.id == account_id,
+        PublishAccount.user_id == user_id
+    ).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="账号不存在")
+
+    article = db.query(WechatArticle).filter(
+        WechatArticle.id == article_id,
+        WechatArticle.account_id == account_id,
+    ).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="文章不存在")
+
+    # 检查该用户是否已有正在处理的分析任务（避免并发重复调用LLM）
+    existing_task = db.query(AsyncTask).filter(
+        AsyncTask.task_type == "article_analysis",
+        AsyncTask.status.in_(["queued", "running"]),
+        AsyncTask.created_by == user_id,
+    ).first()
+    if existing_task:
+        return {"code": 0, "message": "已有分析任务在执行中", "data": {"task_id": existing_task.id}}
+
+    # 创建异步任务
+    task = AsyncTask(
+        task_type="article_analysis",
+        status="queued",
+        created_by=user_id,
+        payload_json=json.dumps(
+            {"article_id": article_id, "analysis_type": "full"}, ensure_ascii=False),
+        progress_message=f"AI分析文章 [{article.title[:20]}]",
+    )
+    db.add(task)
+    db.commit()
+
+    # 分析记录置为 processing（不存在则创建）
+    analysis_record = db.query(ArticleAnalysis).filter(
+        ArticleAnalysis.article_id == article_id,
+        ArticleAnalysis.analysis_type == "full",
+    ).first()
+    if analysis_record:
+        analysis_record.status = "processing"
+        analysis_record.failed_reason = ""
+    else:
+        analysis_record = ArticleAnalysis(
+            article_id=article_id,
+            account_id=account_id,
+            user_id=user_id,
+            analysis_type="full",
+            status="processing",
+        )
+        db.add(analysis_record)
+    db.commit()
+
+    return {"code": 0, "message": "分析任务已提交，约10-30秒后完成",
+            "data": {"task_id": task.id}}
+
+
+@router.get("/{account_id}/articles/{article_id}/analysis", summary="获取文章AI分析结果")
+def get_article_analysis(
+    account_id: int,
+    article_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """获取文章AI分析结果"""
+    account = db.query(PublishAccount).filter(
+        PublishAccount.id == account_id,
+        PublishAccount.user_id == user_id
+    ).first()
+    if not account:
+        raise HTTPException(status_code=404, detail="账号不存在")
+
+    article = db.query(WechatArticle).filter(
+        WechatArticle.id == article_id,
+        WechatArticle.account_id == account_id,
+    ).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="文章不存在")
+
+    analysis = db.query(ArticleAnalysis).filter(
+        ArticleAnalysis.article_id == article_id,
+        ArticleAnalysis.analysis_type == "full",
+    ).order_by(ArticleAnalysis.created_at.desc()).first()
+
+    if not analysis:
+        return {"code": 0, "message": "success", "data": {"status": "none", "result": None}}
+
+    result_data = None
+    if analysis.status == "completed" and analysis.result_json:
+        try:
+            result_data = json.loads(analysis.result_json)
+        except Exception:
+            result_data = None
+
+    return {"code": 0, "message": "success", "data": {
+        "status": analysis.status,
+        "created_at": analysis.created_at.isoformat() if analysis.created_at else None,
+        "completed_at": analysis.completed_at.isoformat() if analysis.completed_at else None,
+        "result": result_data,
+        "failed_reason": analysis.failed_reason,
+    }}

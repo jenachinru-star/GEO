@@ -5,10 +5,11 @@ import {
 } from 'antd'
 import {
   ReloadOutlined, ArrowUpOutlined, ArrowDownOutlined,
-  FileTextOutlined, EyeOutlined, LikeOutlined, ShareAltOutlined
+  FileTextOutlined, EyeOutlined, LikeOutlined, ShareAltOutlined,
+  ThunderboltOutlined, FileExcelOutlined
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
-import request from '@/api'
+import request, { exportApi } from '@/api'
 import { useParams, useNavigate } from 'react-router-dom'
 
 const WechatAccountStats = () => {
@@ -131,6 +132,26 @@ const WechatAccountStats = () => {
     { title: '点赞', dataIndex: 'likes', key: 'likes', width: 70, render: (v: number) => <span><LikeOutlined /> {v}</span> },
     { title: '分享', dataIndex: 'shares', key: 'shares', width: 70, render: (v: number) => <span><ShareAltOutlined /> {v}</span> },
     { title: '收藏', dataIndex: 'favorites', key: 'favorites', width: 70 },
+    {
+      title: '操作', key: 'action', width: 170,
+      render: (_: any, record: any) => (
+        <Space size="small">
+          <Button
+            type="link" size="small"
+            onClick={() => navigate(`/publish-accounts/${accountId}/articles/${record.id}`)}
+          >
+            详情
+          </Button>
+          <Button
+            type="link" size="small"
+            icon={<ThunderboltOutlined />}
+            onClick={() => navigate(`/publish-accounts/${accountId}/articles/${record.id}`)}
+          >
+            AI分析
+          </Button>
+        </Space>
+      )
+    },
   ]
 
   return (
@@ -229,7 +250,19 @@ const WechatAccountStats = () => {
           </Row>
 
           {/* 文章列表 */}
-          <Card title="已发布文章">
+          <Card
+            title="已发布文章"
+            extra={
+              <Button
+                type="primary"
+                ghost
+                icon={<FileExcelOutlined />}
+                onClick={() => exportApi.exportWechatArticles(accountId as string)}
+              >
+                导出Excel
+              </Button>
+            }
+          >
             <Table
               columns={articleColumns}
               dataSource={articles}

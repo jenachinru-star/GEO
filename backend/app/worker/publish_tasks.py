@@ -90,6 +90,42 @@ def handle_article_publish(db: Session, task: AsyncTask, on_progress: ProgressCa
     if not result.success:
         raise ValueError(f"发布失败: {result.failed_reason}")
 
+    # 发布成功后，同步存储文章正文到WechatArticle（供AI分析使用）
+    try:
+        from app.models.wechat_stats import WechatArticle
+        from datetime import date
+
+        publish_url = result.publish_url or ""
+
+        # 查找是否已有该文章的记录（同账号 + 标题完全匹配）
+        article_record = db.query(WechatArticle).filter(
+            WechatArticle.account_id == account.id,
+            WechatArticle.title == article.title,
+        ).first()
+
+        if not article_record:
+            article_record = WechatArticle(
+                account_id=account.id,
+                user_id=user_id,
+                title=article.title,
+                article_url=publish_url,
+                publish_date=date.today(),
+                content=article.content or "",  # 存储正文
+            )
+            db.add(article_record)
+        else:
+            # 已存在（理论上发布前不会有记录）：补全正文和URL
+            if not article_record.content:
+                article_record.content = article.content or ""
+            if publish_url and not article_record.article_url:
+                article_record.article_url = publish_url
+
+        db.commit()
+        logger.info(f"文章正文已同步存储到WechatArticle，article_id={article_record.id}")
+    except Exception as e:
+        logger.warning(f"同步存储文章正文失败（不影响发布结果）: {e}")
+        db.rollback()
+
     return {
         "success": True,
         "platform": platform,

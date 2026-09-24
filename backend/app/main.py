@@ -119,9 +119,13 @@ def scheduled_collect():
 
 
 def scheduled_collect_wechat_data():
-    """定时采集微信公众号数据：每天凌晨2点自动采集所有已验证账号的前一天数据"""
+    """定时采集微信公众号数据：每天凌晨2点，重查"昨天/3天前/7天前"三个群发日。
+    getarticletotal 按群发日返回该文章截至调用日的累计行（最多7天），
+    重查三个群发日即可逐步填满 day_1/3/7 快照，并自动回填遗漏。
+    """
     try:
         import json
+        from datetime import date, timedelta
         from app.models.publish_account import PublishAccount
         from app.models.task import AsyncTask
 
@@ -134,6 +138,14 @@ def scheduled_collect_wechat_data():
             PublishAccount.login_status == "valid",
             PublishAccount.app_id != "",
         ).all()
+
+        # 三个重查群发日：昨天 / 3天前 / 7天前
+        yesterday = date.today() - timedelta(days=1)
+        ref_dates = [
+            yesterday.isoformat(),
+            (yesterday - timedelta(days=2)).isoformat(),  # 3天前
+            (yesterday - timedelta(days=6)).isoformat(),  # 7天前
+        ]
 
         task_count = 0
         for account in accounts:
@@ -152,8 +164,10 @@ def scheduled_collect_wechat_data():
                     task_type="wechat_data_collect",
                     status="queued",
                     created_by=account.user_id,
-                    payload_json=json.dumps({"account_id": account.id, "days": 1}, ensure_ascii=False),
-                    progress_message=f"定时采集微信公众号数据 [{account.account_name}]",
+                    payload_json=json.dumps(
+                        {"account_id": account.id, "dates": ref_dates},
+                        ensure_ascii=False),
+                    progress_message=f"定时采集微信公众号数据 [{account.account_name}]（3个群发日）",
                 )
                 db.add(task)
                 db.commit()

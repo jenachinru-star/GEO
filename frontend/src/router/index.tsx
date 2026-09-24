@@ -23,6 +23,7 @@ const AssetDetail = lazy(() => import('@/pages/AssetDetail'))
 const PublishedList = lazy(() => import('@/pages/PublishedList'))
 const PublishAccounts = lazy(() => import('@/pages/PublishAccounts'))
 const WechatAccountStats = lazy(() => import('@/pages/WechatAccountStats'))
+const WechatArticleDetail = lazy(() => import('@/pages/WechatArticleDetail'))
 const UsageDashboard = lazy(() => import('@/pages/UsageDashboard'))
 const UsageGovernance = lazy(() => import('@/pages/UsageGovernance'))
 const AccountSettings = lazy(() => import('@/pages/AccountSettings'))
@@ -59,6 +60,7 @@ const AppRouter = () => {
           <Route path="asset/:id" element={<RequireAuth><AssetDetail /></RequireAuth>} />
           <Route path="publish-accounts" element={<RequireAuth><PublishAccounts /></RequireAuth>} />
           <Route path="publish-accounts/:accountId/stats" element={<RequireAuth><WechatAccountStats /></RequireAuth>} />
+          <Route path="publish-accounts/:accountId/articles/:articleId" element={<RequireAuth><WechatArticleDetail /></RequireAuth>} />
           <Route path="published" element={<RequireAuth><PublishedList /></RequireAuth>} />
           <Route path="usage" element={<RequireAuth><UsageDashboard /></RequireAuth>} />
           <Route path="usage-governance" element={<RequireAuth><UsageGovernance /></RequireAuth>} />

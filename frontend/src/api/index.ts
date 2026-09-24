@@ -215,6 +215,9 @@ export const exportApi = {
   exportReport: () => downloadFile('/export/report', `GEO完整报告_${Date.now()}.xlsx`),
   exportDoctorReport: () => downloadFile('/export/doctor-report', `GEO医生报告_${Date.now()}.xlsx`),
   exportUsage: (days: number = 30) => downloadFile(`/usage/export?days=${days}`, `用量统计_${days}天_${Date.now()}.xlsx`),
+  exportWechatArticles: (accountId: number | string) =>
+    downloadFile(`/publish-accounts/${accountId}/articles/export`,
+      `公众号文章数据_${Date.now()}.xlsx`),
 }
 
 // ============ 认证 API ============
