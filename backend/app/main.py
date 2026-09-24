@@ -14,10 +14,8 @@ from app.database import init_db, SessionLocal
 from app.api import (
     monitor_router,
     content_router,
-    knowledge_router,
     competitor_router,
     dashboard_router,
-    rag_router,
     system_router,
     export_router,
     auth_router,
@@ -310,10 +308,8 @@ async def usage_context_middleware(request: Request, call_next):
 # 注册路由
 app.include_router(monitor_router)
 app.include_router(content_router)
-app.include_router(knowledge_router)
 app.include_router(competitor_router)
 app.include_router(dashboard_router)
-app.include_router(rag_router)
 app.include_router(system_router)
 app.include_router(export_router)
 app.include_router(auth_router)

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
-from app.models import MonitorRecord, Question, Content, Knowledge, Competitor
+from app.models import MonitorRecord, Question, Content, Competitor
 from app.config import settings
 
 
@@ -152,47 +152,6 @@ class ExportService:
             cls._style_data(ws, 2, len(questions) + 1, len(headers))
 
         col_widths = [6, 40, 10, 20, 8, 8, 18]
-        for col, width in enumerate(col_widths, 1):
-            ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
-        ws.freeze_panes = "A2"
-
-        output = io.BytesIO()
-        wb.save(output)
-        output.seek(0)
-        return output.getvalue()
-
-    @classmethod
-    def export_knowledge(cls, db: Session, user_id: Optional[int] = None) -> bytes:
-        """导出知识库为Excel"""
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "知识库"
-
-        headers = ["ID", "标题", "分类", "级别", "内容", "标签", "状态", "版本", "更新时间"]
-        for col, header in enumerate(headers, 1):
-            ws.cell(row=1, column=col, value=header)
-        cls._style_header(ws, 1, len(headers))
-
-        level_names = {"public": "公开", "internal": "内部", "confidential": "涉密"}
-        knowledge_list = db.query(Knowledge)
-        if user_id is not None:
-            knowledge_list = knowledge_list.filter(Knowledge.user_id == user_id)
-        knowledge_list = knowledge_list.order_by(Knowledge.category, Knowledge.id).all()
-        for row_idx, k in enumerate(knowledge_list, 2):
-            ws.cell(row=row_idx, column=1, value=k.id)
-            ws.cell(row=row_idx, column=2, value=k.title)
-            ws.cell(row=row_idx, column=3, value=k.category)
-            ws.cell(row=row_idx, column=4, value=level_names.get(k.level, k.level))
-            ws.cell(row=row_idx, column=5, value=k.content)
-            ws.cell(row=row_idx, column=6, value=k.tags)
-            ws.cell(row=row_idx, column=7, value="启用" if k.status else "禁用")
-            ws.cell(row=row_idx, column=8, value=k.version)
-            ws.cell(row=row_idx, column=9, value=k.updated_at.strftime("%Y-%m-%d %H:%M:%S") if k.updated_at else "")
-
-        if knowledge_list:
-            cls._style_data(ws, 2, len(knowledge_list) + 1, len(headers))
-
-        col_widths = [6, 20, 12, 8, 60, 15, 8, 6, 18]
         for col, width in enumerate(col_widths, 1):
             ws.column_dimensions[ws.cell(row=1, column=col).column_letter].width = width
         ws.freeze_panes = "A2"

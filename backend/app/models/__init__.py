@@ -2,7 +2,6 @@
 from app.models.question import Question
 from app.models.monitor import MonitorRecord
 from app.models.content import Content
-from app.models.knowledge import Knowledge
 from app.models.competitor import Competitor, CompetitorRecord
 from app.models.user import User
 from app.models.doctor import DoctorProfile
@@ -47,7 +46,6 @@ __all__ = [
     "Question",
     "MonitorRecord",
     "Content",
-    "Knowledge",
     "Competitor",
     "CompetitorRecord",
     "User",

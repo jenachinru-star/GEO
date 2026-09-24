@@ -1,11 +1,12 @@
 """医生Profile API"""
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user_id
 from app.models.doctor import DoctorProfile
 from app.models.semantic import Semantic
-from app.engines.semantic_generator import SemanticGenerator
+from app.models.task import AsyncTask
 
 router = APIRouter(prefix="/api/v1/doctor", tags=["医生Profile"])
 
@@ -62,12 +63,11 @@ def save_profile(data: dict, db: Session = Depends(get_db), user_id: int = Depen
     db.commit()
     db.refresh(profile)
 
-    # 首次创建时自动生成语义
+    # 首次创建或语义为空时，提交异步任务生成语义（不阻塞HTTP响应）
     semantic_count = db.query(Semantic).filter(Semantic.user_id == user_id).count()
-    generated_count = 0
+    semantic_task_id = None
     if is_new or semantic_count == 0:
-        generator = SemanticGenerator(db=db, user_id=user_id)
-        questions = generator.generate({
+        profile_data = {
             "real_name": profile.real_name,
             "title": profile.title,
             "province": profile.province,
@@ -75,14 +75,17 @@ def save_profile(data: dict, db: Session = Depends(get_db), user_id: int = Depen
             "hospital": profile.hospital,
             "department": profile.department,
             "specialty": profile.specialty,
-        })
-        existing = {s.question for s in db.query(Semantic).filter(Semantic.user_id == user_id).all()}
-        for q in questions:
-            if q not in existing:
-                db.add(Semantic(user_id=user_id, question=q, category="general"))
-                generated_count += 1
-        if generated_count > 0:
-            db.commit()
+        }
+        task = AsyncTask(
+            task_type="semantic_generate",
+            status="queued",
+            created_by=user_id,
+            payload_json=json.dumps({"user_id": user_id, "profile": profile_data}, ensure_ascii=False),
+            progress_message="生成医生资料语义问题",
+        )
+        db.add(task)
+        db.commit()
+        semantic_task_id = task.id
 
     return {
         "code": 0,
@@ -98,19 +101,18 @@ def save_profile(data: dict, db: Session = Depends(get_db), user_id: int = Depen
                 "department": profile.department,
                 "specialty": profile.specialty,
             },
-            "semantic_generated": generated_count,
+            "semantic_task_id": semantic_task_id,
         }
     }
 
 
-@router.post("/regenerate-semantics", summary="重新生成语义（只新增不重复）")
+@router.post("/regenerate-semantics", summary="重新生成语义（异步，只新增不重复）")
 def regenerate_semantics(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     profile = db.query(DoctorProfile).filter(DoctorProfile.user_id == user_id).first()
     if not profile:
         raise HTTPException(status_code=400, detail="请先完善Profile")
 
-    generator = SemanticGenerator(db=db, user_id=user_id)
-    questions = generator.generate({
+    profile_data = {
         "real_name": profile.real_name,
         "title": profile.title,
         "province": profile.province,
@@ -118,15 +120,15 @@ def regenerate_semantics(db: Session = Depends(get_db), user_id: int = Depends(g
         "hospital": profile.hospital,
         "department": profile.department,
         "specialty": profile.specialty,
-    })
-
-    existing = {s.question for s in db.query(Semantic).filter(Semantic.user_id == user_id).all()}
-    new_count = 0
-    for q in questions:
-        if q not in existing:
-            db.add(Semantic(user_id=user_id, question=q, category="general"))
-            new_count += 1
-            existing.add(q)
+    }
+    task = AsyncTask(
+        task_type="semantic_generate",
+        status="queued",
+        created_by=user_id,
+        payload_json=json.dumps({"user_id": user_id, "profile": profile_data}, ensure_ascii=False),
+        progress_message="重新生成医生资料语义问题",
+    )
+    db.add(task)
     db.commit()
 
-    return {"code": 0, "message": "success", "data": {"new_count": new_count, "total": len(existing)}}
+    return {"code": 0, "message": "已提交语义生成任务", "data": {"task_id": task.id}}

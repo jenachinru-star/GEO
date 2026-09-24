@@ -1,13 +1,19 @@
 """数字资产 - URL采集引擎
 
 负责抓取网页内容并提取正文、标题、作者等元数据。
-使用 requests + 正则解析，不依赖额外的HTML解析库（保持轻量）。
+首选 trafilatura 专业正文提取，失败时回退到 requests + 正则。
 """
 import re
 import logging
 from typing import Dict, Optional
 from urllib.parse import urlparse
 import requests
+
+try:
+    import trafilatura
+    HAS_TRAFILATURA = True
+except ImportError:
+    HAS_TRAFILATURA = False
 
 logger = logging.getLogger(__name__)
 
@@ -61,21 +67,56 @@ class AssetCollector:
 
             html = resp.text
 
-            # 提取元数据
-            title = self._extract_title(html)
-            author = self._extract_author(html)
-            publish_date = self._extract_publish_date(html)
-            content = self._extract_content(html)
+            # 首选 trafilatura 专业正文提取
+            title = ""
+            author = ""
+            publish_date = ""
+            content = ""
+            trafilatura_ok = False
+
+            if HAS_TRAFILATURA:
+                try:
+                    # 提取元数据
+                    metadata = trafilatura.extract_metadata(html)
+                    if metadata:
+                        title = metadata.title or ""
+                        author = metadata.author or ""
+                        if metadata.date:
+                            publish_date = str(metadata.date)[:10]
+                    # 提取正文
+                    extracted = trafilatura.extract(
+                        html,
+                        output_format="txt",
+                        include_comments=False,
+                        include_tables=True,
+                        no_fallback=False,
+                    )
+                    if extracted and len(extracted) >= 200:
+                        content = extracted.strip()
+                        trafilatura_ok = True
+                        logger.info(f"trafilatura提取成功: content_len={len(content)}")
+                except Exception as e:
+                    logger.warning(f"trafilatura提取失败，回退正则: {e}")
+
+            # trafilatura 失败或内容过短时，回退到正则方法
+            if not trafilatura_ok:
+                if not title:
+                    title = self._extract_title(html)
+                if not author:
+                    author = self._extract_author(html)
+                if not publish_date:
+                    publish_date = self._extract_publish_date(html)
+                content = self._extract_content(html)
 
             # 来源网站
             source_site = parsed.netloc
 
             # 检查内容是否太短（JS渲染的网站通常拿不到正文）
-            if len(content) < 100:
+            if len(content) < 200:
                 logger.warning(f"采集内容过短，可能是JS渲染页面: {len(content)}字符")
                 return {
                     "success": False,
-                    "error": "该网站需要JavaScript渲染，暂不支持自动采集，请手动粘贴内容",
+                    "error": "无法自动提取正文（可能需要登录或JavaScript渲染），请手动粘贴内容",
                     "title": title or "未命名",
                     "content": "",
                     "author": "",

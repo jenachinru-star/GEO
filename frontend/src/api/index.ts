@@ -137,29 +137,12 @@ export const contentApi = {
   delete: (id: number) => request.delete(`/content/${id}`)
 }
 
-// ============ 知识库 API ============
-export const knowledgeApi = {
-  getList: (params?: any) => request.get('/knowledge', { params }),
-  create: (data: any) => request.post('/knowledge', data),
-  update: (id: number, data: any) => request.put(`/knowledge/${id}`, data),
-  delete: (id: number) => request.delete(`/knowledge/${id}`),
-  search: (query: string, level = 'public') =>
-    request.post('/knowledge/search', null, { params: { query, level } }),
-  rebuildEmbeddings: () => request.post('/knowledge/rebuild-embeddings')
-}
-
 // ============ 竞品 API ============
 export const competitorApi = {
   getList: (params?: any) => request.get('/competitor', { params }),
   create: (data: any) => request.post('/competitor', data),
   delete: (id: number) => request.delete(`/competitor/${id}`),
   getRecords: (params?: any) => request.get('/competitor/records', { params })
-}
-
-// ============ RAG问答 API ============
-export const ragApi = {
-  query: (data: any) => request.post('/rag/query', data),
-  getPlatforms: () => request.get('/rag/platforms')
 }
 
 // ============ 系统 API ============
@@ -210,7 +193,6 @@ export const exportApi = {
     return downloadFile(`/export/monitor${params}`, `监测记录_${Date.now()}.xlsx`)
   },
   exportQuestions: () => downloadFile('/export/questions', `监测问题_${Date.now()}.xlsx`),
-  exportKnowledge: () => downloadFile('/export/knowledge', `知识库_${Date.now()}.xlsx`),
   exportContent: () => downloadFile('/export/content', `内容资产_${Date.now()}.xlsx`),
   exportReport: () => downloadFile('/export/report', `GEO完整报告_${Date.now()}.xlsx`),
   exportDoctorReport: () => downloadFile('/export/doctor-report', `GEO医生报告_${Date.now()}.xlsx`),

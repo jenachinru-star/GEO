@@ -46,13 +46,6 @@ def export_questions(db: Session = Depends(get_db), user_id: int = Depends(get_c
     return _excel_response(data, filename)
 
 
-@router.get("/knowledge", summary="导出知识库")
-def export_knowledge(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
-    data = ExportService.export_knowledge(db, user_id=user_id)
-    filename = f"知识库_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
-    return _excel_response(data, filename)
-
-
 @router.get("/content", summary="导出内容资产")
 def export_content(db: Session = Depends(get_db), user_id: int = Depends(get_current_user_id)):
     data = ExportService.export_content(db, user_id=user_id)

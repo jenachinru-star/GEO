@@ -7,6 +7,7 @@ from datetime import datetime
 from app.database import get_db
 from app.deps import get_current_user_id
 from app.models.task import AsyncTask
+from app.utils.task_meta import get_task_type_name
 
 router = APIRouter(prefix="/api/v1/task", tags=["异步任务"])
 
@@ -42,6 +43,7 @@ def get_task(
         "id": task.id,
         "user_seq": user_seq,
         "task_type": task.task_type,
+        "task_type_name": get_task_type_name(task.task_type),
         "status": task.status,
         "progress": task.progress,
         "progress_message": task.progress_message,
@@ -83,6 +85,7 @@ def list_tasks(
             "id": t.id,
             "user_seq": user_seq,
             "task_type": t.task_type,
+            "task_type_name": get_task_type_name(t.task_type),
             "status": t.status,
             "progress": t.progress,
             "progress_message": t.progress_message,

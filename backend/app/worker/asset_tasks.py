@@ -87,9 +87,24 @@ def _auto_tag_document(db: Session, source: AssetSource, doc: AssetDocument):
         return
 
     try:
-        adapter = adapter_factory.get_adapter("glm")
+        # 获取用户启用的平台（过滤用户停用的），不再硬编码glm
+        from app.models.user_platform_pref import UserPlatformPref
+        platforms = adapter_factory.get_enabled_platforms()
+        disabled = {
+            pref.platform_code for pref in
+            db.query(UserPlatformPref).filter(
+                UserPlatformPref.user_id == source.user_id,
+                UserPlatformPref.enabled == False
+            ).all()
+        }
+        enabled_platforms = [p for p in platforms if p not in disabled]
+        if not enabled_platforms:
+            logger.info(f"用户 [{source.user_id}] 无启用的AI平台，跳过自动打标签")
+            return
+
+        adapter = adapter_factory.get_adapter(enabled_platforms[0])
         if not adapter:
-            logger.info("GLM适配器未配置，跳过自动打标签")
+            logger.info(f"平台 {enabled_platforms[0]} 适配器不可用，跳过自动打标签")
             return
 
         # 取前500字作为参考

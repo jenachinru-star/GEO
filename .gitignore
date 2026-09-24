@@ -22,7 +22,10 @@ pnpm-debug.log*
 
 # ---- 数据库与备份 ----
 *.db
+*.db-shm
+*.db-wal
 *.db.backup_*
+backend/data/
 backend/data/*.sqlite*
 backend/data/*.sqlite3*
 

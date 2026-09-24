@@ -18,7 +18,8 @@ import {
   LogoutOutlined,
   AppstoreOutlined,
   SendOutlined,
-  SafetyCertificateOutlined
+  SafetyCertificateOutlined,
+  ThunderboltOutlined
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store/useStore'
@@ -42,6 +43,7 @@ const getAllMenuItems = () => [
     ],
   },
   { key: '/asset', icon: <BookOutlined />, label: '数字资产' },
+  { key: '/chat', icon: <ThunderboltOutlined />, label: '智能问答' },
   { key: '/tasks', icon: <SyncOutlined />, label: '任务中心' },
   { key: '/usage', icon: <RobotOutlined />, label: '用量统计' },
   { key: '/usage-governance', icon: <SafetyCertificateOutlined />, label: '用量管理' },

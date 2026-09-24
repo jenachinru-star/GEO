@@ -7,9 +7,8 @@ const Dashboard = lazy(() => import('@/pages/Dashboard'))
 const Monitor = lazy(() => import('@/pages/Monitor'))
 const DataCenter = lazy(() => import('@/pages/DataCenter'))
 const ContentHub = lazy(() => import('@/pages/ContentHub'))
-const Knowledge = lazy(() => import('@/pages/Knowledge'))
 const Competitor = lazy(() => import('@/pages/Competitor'))
-const RAGChat = lazy(() => import('@/pages/RAGChat'))
+const KnowledgeChat = lazy(() => import('@/pages/KnowledgeChat'))
 const Settings = lazy(() => import('@/pages/Settings'))
 const SSOCallback = lazy(() => import('@/pages/SSOCallback'))
 const Login = lazy(() => import('@/pages/Login'))
@@ -49,9 +48,8 @@ const AppRouter = () => {
           <Route path="content" element={<RequireAuth><ContentHub /></RequireAuth>} />
           <Route path="distribution" element={<RequireAuth><Distribution /></RequireAuth>} />
           <Route path="create" element={<Navigate to="/content" replace />} />
-          <Route path="knowledge" element={<RequireAuth><Knowledge /></RequireAuth>} />
           <Route path="competitor" element={<RequireAuth><Competitor /></RequireAuth>} />
-          <Route path="rag" element={<RequireAuth><RAGChat /></RequireAuth>} />
+          <Route path="chat" element={<RequireAuth><KnowledgeChat /></RequireAuth>} />
           <Route path="settings" element={<RequireAuth><Settings /></RequireAuth>} />
           <Route path="profile" element={<RequireAuth><Profile /></RequireAuth>} />
           <Route path="semantic" element={<RequireAuth><Semantic /></RequireAuth>} />

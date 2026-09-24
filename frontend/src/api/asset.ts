@@ -110,6 +110,8 @@ export const assetApi = {
     top_k?: number
   }) => request.post('/asset/chat/compare', data),
 
+  getChatSuggestions: () => request.get('/asset/chat/suggestions'),
+
   // ===== PubMed 文献导入 =====
   searchPubMed: (query: string, maxResults: number = 10) =>
     request.post('/asset/pubmed/search', { query, max_results: maxResults }),

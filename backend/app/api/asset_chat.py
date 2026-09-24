@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.deps import get_current_user_id
-from app.models.asset import AssetChatSession, AssetChatMessage, AssetChunk, AssetDocument
+from app.models.asset import AssetChatSession, AssetChatMessage, AssetChunk, AssetDocument, AssetSource
 from app.engines.asset_embedder import asset_embedder
 from app.adapters import adapter_factory
 from app.usage_context import usage_context
@@ -95,7 +95,7 @@ ASSISTANT_TEMPLATES = {
 }
 
 
-async def detect_template(message: str) -> str:
+def detect_template(message: str) -> str:
     """根据用户输入自动识别最合适的模板"""
     msg = message.lower()
 
@@ -370,8 +370,24 @@ def send_message(
     db.add(user_msg)
     db.commit()
 
-    # 3. RAG检索相关知识
-    query_vec = asset_embedder.embed_text(req.message)
+    # 3. 获取对话历史（最近2轮，用于query改写提升检索质量）
+    recent_messages = db.query(AssetChatMessage).filter(
+        AssetChatMessage.session_id == session.id,
+        AssetChatMessage.id != user_msg.id,
+    ).order_by(AssetChatMessage.created_at.desc()).limit(4).all()
+    recent_messages.reverse()
+
+    # query改写：把最近2轮上下文加入检索query
+    history_for_query = []
+    for m in recent_messages[-4:]:  # 最近2轮=4条消息
+        role = "用户" if m.role == "user" else "助手"
+        history_for_query.append(f"{role}: {m.content}")
+    retrieval_query = req.message
+    if history_for_query:
+        retrieval_query = req.message + "\n\n上下文：\n" + "\n".join(history_for_query)
+
+    # 4. RAG检索相关知识（用改写后的query）
+    query_vec = asset_embedder.embed_text(retrieval_query)
 
     # 确定检索范围：如果指定了文档，只检索该文档；否则检索用户全部知识库
     chunk_query = db.query(AssetChunk).filter(
@@ -397,10 +413,15 @@ def send_message(
 
         chunk_scores.sort(key=lambda x: x[1], reverse=True)
 
+        # 批量查询文档（避免N+1查询）
+        top_chunks = chunk_scores[:req.top_k * 2]
+        doc_ids = list({c.document_id for c, _ in top_chunks})
+        doc_map = {d.id: d for d in db.query(AssetDocument).filter(AssetDocument.id.in_(doc_ids)).all()}
+
         # 取top_k个chunk
         seen_docs = set()
-        for chunk, score in chunk_scores[:req.top_k * 2]:
-            doc = db.query(AssetDocument).filter(AssetDocument.id == chunk.document_id).first()
+        for chunk, score in top_chunks:
+            doc = doc_map.get(chunk.document_id)
             if not doc:
                 continue
 
@@ -419,33 +440,32 @@ def send_message(
 
     context = "\n\n".join(context_parts) if context_parts else "（知识库中未找到相关内容）"
 
-    # 4. 获取对话历史（最近10轮）
-    recent_messages = db.query(AssetChatMessage).filter(
+    # 5. 构建完整对话历史（最近10轮，用于LLM上下文）
+    all_recent = db.query(AssetChatMessage).filter(
         AssetChatMessage.session_id == session.id,
         AssetChatMessage.id != user_msg.id,
     ).order_by(AssetChatMessage.created_at.desc()).limit(20).all()
-    recent_messages.reverse()
+    all_recent.reverse()
 
     history_lines = []
-    for m in recent_messages:
+    for m in all_recent:
         role = "用户" if m.role == "user" else "助手"
         history_lines.append(f"{role}: {m.content}")
     history_text = "\n".join(history_lines[-10:]) if history_lines else ""
 
-    # 5. 确定使用的模板
+    # 6. 确定使用的模板
     template_key = req.template
     if template_key == "auto":
-        # 自动识别模板
-        import asyncio
+        # 自动识别模板（同步函数，直接调用）
         try:
-            template_key = asyncio.run(detect_template(req.message))
+            template_key = detect_template(req.message)
         except:
             template_key = "general"
 
     template_info = ASSISTANT_TEMPLATES.get(template_key, ASSISTANT_TEMPLATES["general"])
     template_addon = template_info.get("system_addon", "")
 
-    # 6. 构建system_prompt
+    # 7. 构建system_prompt
     system_prompt = f"""你是一位专业的医学知识助手。请基于用户的个人知识库内容回答问题。
 
 {template_addon}
@@ -463,7 +483,7 @@ def send_message(
 {history_text if history_text else "（无历史对话）"}
 """
 
-    # 6. 调用AI模型
+    # 8. 调用AI模型
     adapter = adapter_factory.get_adapter(req.platform)
     if not adapter:
         enabled = adapter_factory.get_enabled_platforms()
@@ -490,7 +510,7 @@ def send_message(
         if not result.success:
             raise HTTPException(status_code=500, detail=f"AI回答失败: {result.error}")
 
-        # 7. 保存AI回复
+        # 9. 保存AI回复
         assistant_msg = AssetChatMessage(
             session_id=session.id,
             user_id=user_id,
@@ -578,9 +598,15 @@ def compare_models(
             chunk_scores.append((chunk, score))
 
         chunk_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # 批量查询文档（避免N+1查询）
+        top_chunks = chunk_scores[:req.top_k * 2]
+        doc_ids = list({c.document_id for c, _ in top_chunks})
+        doc_map = {d.id: d for d in db.query(AssetDocument).filter(AssetDocument.id.in_(doc_ids)).all()}
+
         seen_docs = set()
-        for chunk, score in chunk_scores[:req.top_k * 2]:
-            doc = db.query(AssetDocument).filter(AssetDocument.id == chunk.document_id).first()
+        for chunk, score in top_chunks:
+            doc = doc_map.get(chunk.document_id)
             if not doc:
                 continue
             context_parts.append(f"【{doc.title}】\n{chunk.content}")
@@ -701,8 +727,23 @@ def chat_stream(
     db.add(user_msg)
     db.commit()
 
-    # 3. RAG检索相关知识
-    query_vec = asset_embedder.embed_text(req.message)
+    # 3. 获取对话历史（最近2轮，用于query改写）
+    recent_for_query = db.query(AssetChatMessage).filter(
+        AssetChatMessage.session_id == session.id,
+        AssetChatMessage.id != user_msg.id,
+    ).order_by(AssetChatMessage.created_at.desc()).limit(4).all()
+    recent_for_query.reverse()
+
+    history_for_query = []
+    for m in recent_for_query:
+        role = "用户" if m.role == "user" else "助手"
+        history_for_query.append(f"{role}: {m.content}")
+    retrieval_query = req.message
+    if history_for_query:
+        retrieval_query = req.message + "\n\n上下文：\n" + "\n".join(history_for_query)
+
+    # 4. RAG检索相关知识（用改写后的query）
+    query_vec = asset_embedder.embed_text(retrieval_query)
     chunk_query = db.query(AssetChunk).filter(
         AssetChunk.user_id == user_id,
         AssetChunk.embedding != "",
@@ -722,9 +763,15 @@ def chat_stream(
             score = asset_embedder.cosine_similarity(query_vec, chunk_vec)
             chunk_scores.append((chunk, score))
         chunk_scores.sort(key=lambda x: x[1], reverse=True)
+
+        # 批量查询文档（避免N+1查询）
+        top_chunks = chunk_scores[:req.top_k * 2]
+        doc_ids = list({c.document_id for c, _ in top_chunks})
+        doc_map = {d.id: d for d in db.query(AssetDocument).filter(AssetDocument.id.in_(doc_ids)).all()}
+
         seen_docs = set()
-        for chunk, score in chunk_scores[:req.top_k * 2]:
-            doc = db.query(AssetDocument).filter(AssetDocument.id == chunk.document_id).first()
+        for chunk, score in top_chunks:
+            doc = doc_map.get(chunk.document_id)
             if not doc:
                 continue
             context_parts.append(f"【{doc.title}】\n{chunk.content}")
@@ -736,7 +783,7 @@ def chat_stream(
 
     context = "\n\n".join(context_parts) if context_parts else "（知识库中未找到相关内容）"
 
-    # 4. 构建system_prompt
+    # 5. 构建system_prompt
     system_prompt = f"""你是一位专业的医学知识助手。请基于用户的个人知识库内容回答问题。
 
 要求：
@@ -748,7 +795,7 @@ def chat_stream(
 {context}
 """
 
-    # 5. 获取适配器
+    # 6. 获取适配器
     adapter = adapter_factory.get_adapter(req.platform)
     if not adapter:
         enabled = adapter_factory.get_enabled_platforms()
@@ -757,7 +804,7 @@ def chat_stream(
         adapter = adapter_factory.get_adapter(enabled[0])
         req.platform = enabled[0]
 
-    # 6. SSE生成器
+    # 7. SSE生成器
     def generate():
         full_answer = ""
         tokens_input = 0
@@ -835,3 +882,84 @@ def chat_stream(
             "Connection": "keep-alive",
         }
     )
+
+
+# ============ 推荐问题 ============
+
+@router.get("/chat/suggestions", summary="获取推荐问题（基于用户最近收藏）")
+def get_suggestions(
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """基于用户最近5篇资产标题，用LLM生成3个推荐问题"""
+    # 取用户最近5篇已完成的资产
+    recent_sources = db.query(AssetSource).filter(
+        AssetSource.user_id == user_id,
+        AssetSource.status == "completed",
+    ).order_by(AssetSource.created_at.desc()).limit(5).all()
+
+    if not recent_sources:
+        return {"code": 0, "message": "success", "data": {"suggestions": []}}
+
+    titles = [s.title for s in recent_sources if s.title]
+    if not titles:
+        return {"code": 0, "message": "success", "data": {"suggestions": []}}
+
+    # 获取用户启用的平台
+    from app.models.user_platform_pref import UserPlatformPref
+    platforms = adapter_factory.get_enabled_platforms()
+    disabled = {
+        pref.platform_code for pref in
+        db.query(UserPlatformPref).filter(
+            UserPlatformPref.user_id == user_id,
+            UserPlatformPref.enabled == False
+        ).all()
+    }
+    enabled_platforms = [p for p in platforms if p not in disabled]
+    if not enabled_platforms:
+        return {"code": 0, "message": "success", "data": {"suggestions": []}}
+
+    adapter = adapter_factory.get_adapter(enabled_platforms[0])
+    if not adapter:
+        return {"code": 0, "message": "success", "data": {"suggestions": []}}
+
+    # 构建prompt
+    titles_text = "\n".join([f"- {t}" for t in titles])
+    prompt = f"""用户最近收藏了以下医学相关文章：
+{titles_text}
+
+请基于这些文章的主题，生成3个用户可能感兴趣的问题，用于医学知识助手对话。
+要求：
+1. 问题要具体、有深度，不要太泛泛
+2. 与用户收藏的内容相关
+3. 适合医学专业人士提问
+4. 只返回问题，每行一个，不要编号，不要其他内容"""
+
+    try:
+        result = adapter.query(
+            prompt,
+            system_prompt="你是一个医学知识助手，擅长根据用户兴趣推荐问题。只返回问题列表。",
+            usage_ctx={"task_type": "asset_chat_suggestions", "source": "http"}
+        )
+
+        if result.success and result.answer:
+            # 解析问题列表
+            lines = result.answer.strip().split("\n")
+            suggestions = []
+            import re
+            for line in lines:
+                line = line.strip()
+                # 去掉编号（1. 2. 3. 或 - 或 *）
+                if line and len(line) > 3:
+                    line = re.sub(r'^[\d\.\-\*\s]+', '', line).strip()
+                    if line and len(line) > 5:
+                        suggestions.append(line)
+                if len(suggestions) >= 3:
+                    break
+
+            return {"code": 0, "message": "success", "data": {"suggestions": suggestions[:3]}}
+
+    except Exception as e:
+        logger.warning(f"生成推荐问题失败: {e}")
+
+    return {"code": 0, "message": "success", "data": {"suggestions": []}}

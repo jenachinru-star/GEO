@@ -131,7 +131,7 @@ const Profile = () => {
       values.clinic_hours = JSON.stringify(clinicHours)
 
       const res: any = await doctorApi.saveProfile(values)
-      message.success(`保存成功，已自动生成 ${res.data?.semantic_generated || 0} 个语义问题`)
+      message.success('保存成功，语义问题正在后台生成中')
       setDoctorProfile(res.data?.profile)
       setShowSuccess(true)
     } catch (e) {
@@ -531,7 +531,7 @@ const Profile = () => {
           </div>
           <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 8 }}>资料保存成功！</div>
           <div style={{ fontSize: 14, color: '#64748B', marginBottom: 24 }}>
-            医生资料已更新，系统已自动生成相关语义问题
+            医生资料已更新，系统正在后台生成语义问题，可在「任务中心」查看进度
           </div>
           <div style={{ background: '#F0F9FF', padding: 16, borderRadius: 12, textAlign: 'left', marginBottom: 20 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: '#0369A1', marginBottom: 8 }}>📋 下一步建议</div>

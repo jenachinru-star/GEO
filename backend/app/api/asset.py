@@ -16,7 +16,10 @@ from pydantic import BaseModel
 
 from app.database import get_db
 from app.deps import get_current_user_id
-from app.models.asset import AssetSource, AssetDocument, AssetNote
+from app.models.asset import (
+    AssetSource, AssetDocument, AssetNote, AssetChunk,
+    AssetGenerated, AssetChatSession, AssetChatMessage,
+)
 from app.models.task import AsyncTask
 from app.utils.url_safety import is_safe_url
 
@@ -445,10 +448,23 @@ def delete_source(
         except Exception:
             pass
 
-    # 级联删除文档及其关联
-    doc = db.query(AssetDocument).filter(AssetDocument.source_id == source_id, AssetDocument.is_current == True).first()
-    if doc:
-        db.delete(doc)
+    # 级联删除：所有版本文档 → chunk/笔记/生成内容/对话
+    docs = db.query(AssetDocument).filter(AssetDocument.source_id == source_id).all()
+    doc_ids = [d.id for d in docs]
+    if doc_ids:
+        # 删除分块
+        db.query(AssetChunk).filter(AssetChunk.document_id.in_(doc_ids)).delete(synchronize_session=False)
+        # 删除笔记
+        db.query(AssetNote).filter(AssetNote.document_id.in_(doc_ids)).delete(synchronize_session=False)
+        # 删除AI生成内容
+        db.query(AssetGenerated).filter(AssetGenerated.document_id.in_(doc_ids)).delete(synchronize_session=False)
+        # 删除对话消息（关联到文档的）
+        db.query(AssetChatMessage).filter(AssetChatMessage.source_document_id.in_(doc_ids)).delete(synchronize_session=False)
+        # 删除对话会话
+        db.query(AssetChatSession).filter(AssetChatSession.document_id.in_(doc_ids)).delete(synchronize_session=False)
+        # 删除文档本身
+        db.query(AssetDocument).filter(AssetDocument.source_id == source_id).delete(synchronize_session=False)
+
     db.delete(source)
     db.commit()
     return {"code": 0, "message": "success"}

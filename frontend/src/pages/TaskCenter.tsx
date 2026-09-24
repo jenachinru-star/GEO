@@ -7,16 +7,6 @@ import { formatUtcTime as formatTime } from '@/utils/time'
 
 const { Title } = Typography
 
-// 任务类型名称映射
-const TASK_TYPE_NAMES: Record<string, string> = {
-  geo_refresh: 'GEO/AEO刷新',
-  monitor_collect: '监测采集',
-  article_generate: '文章生成',
-  image_generate: '图片生成',
-  video_generate: '视频生成',
-  agent_chat: '智能体对话',
-}
-
 // 状态配置
 const STATUS_CONFIG: Record<string, { color: string; label: string; icon: any }> = {
   queued: { color: 'default', label: '等待中', icon: <ClockCircleOutlined /> },
@@ -77,7 +67,7 @@ const TaskCenter = () => {
       width: 200,
       render: (type: string, record: any) => (
         <div>
-          <div>{TASK_TYPE_NAMES[type] || type} #{record.user_seq || record.id}</div>
+          <div>{record.task_type_name || record.task_type} #{record.user_seq || record.id}</div>
           <div style={{ fontSize: 12, color: '#94a3b8' }}>{record.created_at?.slice(5, 16)}</div>
         </div>
       ),

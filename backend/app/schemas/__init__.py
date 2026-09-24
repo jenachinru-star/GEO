@@ -109,39 +109,6 @@ class ContentDetailOut(ContentOut):
     content: str
 
 
-# ============ 知识库 ============
-class KnowledgeCreate(BaseModel):
-    title: str
-    category: str = "company"
-    level: str = "public"
-    content: str = ""
-    tags: str = ""
-
-
-class KnowledgeUpdate(BaseModel):
-    title: Optional[str] = None
-    category: Optional[str] = None
-    level: Optional[str] = None
-    content: Optional[str] = None
-    tags: Optional[str] = None
-    status: Optional[bool] = None
-
-
-class KnowledgeOut(BaseModel):
-    id: int
-    title: str
-    category: str
-    level: str
-    content: str
-    version: int
-    tags: str
-    status: bool
-    updated_at: Optional[datetime] = None
-
-    class Config:
-        from_attributes = True
-
-
 # ============ 竞品 ============
 class CompetitorCreate(BaseModel):
     name: str
@@ -178,26 +145,6 @@ class DashboardStats(BaseModel):
     platform_stats: List[dict]
     top_ranking: List[dict]
     bottom_ranking: List[dict]
-
-
-# ============ RAG问答 ============
-class ChatMessage(BaseModel):
-    role: str  # user / assistant
-    content: str
-
-
-class RAGQuery(BaseModel):
-    query: str
-    platform: str = "glm"
-    level: str = "public"
-    history: List[ChatMessage] = []  # 对话历史，用于多轮对话
-
-
-class RAGResponse(BaseModel):
-    answer: str
-    sources: List[dict]
-    platform: str
-    success: bool
 
 
 # ============ 采集任务 ============

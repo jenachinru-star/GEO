@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.models import Question, MonitorRecord, Content, Knowledge, Competitor
+from app.models import Question, MonitorRecord, Content, Competitor
 from app.adapters import adapter_factory
 
 
