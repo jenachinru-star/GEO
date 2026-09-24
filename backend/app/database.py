@@ -45,7 +45,7 @@ def get_db():
 
 def init_db():
     """初始化数据库表"""
-    from app.models import platform, question, monitor, content, knowledge, competitor, user, doctor, semantic, article, subscription, distribution
+    from app.models import platform, question, monitor, content, competitor, user, doctor, semantic, article, subscription, distribution
     from app.models import asset  # 数字资产模块
     from app.models import video_task  # 视频生成任务
     Base.metadata.create_all(bind=engine)
