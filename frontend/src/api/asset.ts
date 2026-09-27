@@ -1,4 +1,4 @@
-﻿import request from './index'
+import request from './index'
 
 // ============ 数字资产 API ============
 
@@ -23,6 +23,7 @@ export const assetApi = {
     content?: string
     category?: string
     tags?: string
+    force_refresh?: boolean
   }) => request.post('/asset/sources', data),
 
   getSourceDetail: (id: number) => request.get(`/asset/sources/${id}`),

@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, Input, Button, Space, Typography, Tag, Empty, Spin, Pagination, Modal, Form, Upload, message, Tabs, Divider, Layout, Tree, Popconfirm } from 'antd'
 import { PlusOutlined, SearchOutlined, LinkOutlined, FileTextOutlined, BookOutlined, UploadOutlined, LoadingOutlined, FolderOutlined, StarOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
@@ -259,7 +259,7 @@ const AssetHub = () => {
 
   // 把文件夹树转成AntD Tree需要的格式
   const buildTreeData = (folders: any[]) => {
-    const result = [
+    const result: any[] = [
       { key: 'all', title: '全部资产', icon: <FolderOutlined /> },
       { key: 'starred', title: '星标收藏', icon: <StarOutlined /> },
     ]

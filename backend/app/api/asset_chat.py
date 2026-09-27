@@ -118,6 +118,49 @@ def detect_template(message: str) -> str:
     return "general"
 
 
+
+
+def _retrieve_chunks(db, user_id: int, query_vec, document_id=None, top_k: int = 5):
+    """RAG检索相关chunk，返回(context_str, sources_list) - 三处对话接口共用"""
+    chunk_query = db.query(AssetChunk).filter(
+        AssetChunk.user_id == user_id,
+        AssetChunk.embedding != "",
+    )
+    if document_id:
+        chunk_query = chunk_query.filter(AssetChunk.document_id == document_id)
+    chunks = chunk_query.all()
+
+    context_parts = []
+    sources = []
+    if chunks:
+        chunk_scores = []
+        for chunk in chunks:
+            chunk_vec = asset_embedder.json_to_vector(chunk.embedding)
+            if not chunk_vec:
+                continue
+            score = asset_embedder.cosine_similarity(query_vec, chunk_vec)
+            chunk_scores.append((chunk, score))
+        chunk_scores.sort(key=lambda x: x[1], reverse=True)
+
+        top_chunks = chunk_scores[:top_k * 2]
+        doc_ids = list({c.document_id for c, _ in top_chunks})
+        doc_map = {d.id: d for d in db.query(AssetDocument).filter(AssetDocument.id.in_(doc_ids)).all()}
+
+        seen_docs = set()
+        for chunk, score in top_chunks:
+            doc = doc_map.get(chunk.document_id)
+            if not doc:
+                continue
+            context_parts.append(f"【{doc.title}】\n{chunk.content}")
+            if doc.id not in seen_docs:
+                seen_docs.add(doc.id)
+                sources.append({"id": doc.id, "title": doc.title, "score": float(score)})
+            if len(context_parts) >= top_k:
+                break
+
+    context = "\n\n".join(context_parts) if context_parts else "（知识库中未找到相关内容）"
+    return context, sources
+
 # ============ 请求体模型 ============
 
 class ChatSendRequest(BaseModel):
@@ -390,55 +433,7 @@ def send_message(
     query_vec = asset_embedder.embed_text(retrieval_query)
 
     # 确定检索范围：如果指定了文档，只检索该文档；否则检索用户全部知识库
-    chunk_query = db.query(AssetChunk).filter(
-        AssetChunk.user_id == user_id,
-        AssetChunk.embedding != "",
-    )
-    if req.document_id:
-        chunk_query = chunk_query.filter(AssetChunk.document_id == req.document_id)
-
-    chunks = chunk_query.all()
-
-    context_parts = []
-    sources = []
-    if chunks:
-        # 计算相似度
-        chunk_scores = []
-        for chunk in chunks:
-            chunk_vec = asset_embedder.json_to_vector(chunk.embedding)
-            if not chunk_vec:
-                continue
-            score = asset_embedder.cosine_similarity(query_vec, chunk_vec)
-            chunk_scores.append((chunk, score))
-
-        chunk_scores.sort(key=lambda x: x[1], reverse=True)
-
-        # 批量查询文档（避免N+1查询）
-        top_chunks = chunk_scores[:req.top_k * 2]
-        doc_ids = list({c.document_id for c, _ in top_chunks})
-        doc_map = {d.id: d for d in db.query(AssetDocument).filter(AssetDocument.id.in_(doc_ids)).all()}
-
-        # 取top_k个chunk
-        seen_docs = set()
-        for chunk, score in top_chunks:
-            doc = doc_map.get(chunk.document_id)
-            if not doc:
-                continue
-
-            context_parts.append(f"【{doc.title}】\n{chunk.content}")
-
-            if doc.id not in seen_docs:
-                seen_docs.add(doc.id)
-                sources.append({
-                    "id": doc.id,
-                    "title": doc.title,
-                    "score": float(score),
-                })
-
-            if len(context_parts) >= req.top_k:
-                break
-
-    context = "\n\n".join(context_parts) if context_parts else "（知识库中未找到相关内容）"
+    context, sources = _retrieve_chunks(db, user_id, query_vec, req.document_id, req.top_k)
 
     # 5. 构建完整对话历史（最近10轮，用于LLM上下文）
     all_recent = db.query(AssetChatMessage).filter(
@@ -577,46 +572,7 @@ def compare_models(
 
     # 1. RAG检索相关知识（和单模型对话一样）
     query_vec = asset_embedder.embed_text(req.message)
-    chunk_query = db.query(AssetChunk).filter(
-        AssetChunk.user_id == user_id,
-        AssetChunk.embedding != "",
-    )
-    if req.document_id:
-        chunk_query = chunk_query.filter(AssetChunk.document_id == req.document_id)
-
-    chunks = chunk_query.all()
-
-    context_parts = []
-    sources = []
-    if chunks:
-        chunk_scores = []
-        for chunk in chunks:
-            chunk_vec = asset_embedder.json_to_vector(chunk.embedding)
-            if not chunk_vec:
-                continue
-            score = asset_embedder.cosine_similarity(query_vec, chunk_vec)
-            chunk_scores.append((chunk, score))
-
-        chunk_scores.sort(key=lambda x: x[1], reverse=True)
-
-        # 批量查询文档（避免N+1查询）
-        top_chunks = chunk_scores[:req.top_k * 2]
-        doc_ids = list({c.document_id for c, _ in top_chunks})
-        doc_map = {d.id: d for d in db.query(AssetDocument).filter(AssetDocument.id.in_(doc_ids)).all()}
-
-        seen_docs = set()
-        for chunk, score in top_chunks:
-            doc = doc_map.get(chunk.document_id)
-            if not doc:
-                continue
-            context_parts.append(f"【{doc.title}】\n{chunk.content}")
-            if doc.id not in seen_docs:
-                seen_docs.add(doc.id)
-                sources.append({"id": doc.id, "title": doc.title, "score": float(score)})
-            if len(context_parts) >= req.top_k:
-                break
-
-    context = "\n\n".join(context_parts) if context_parts else "（知识库中未找到相关内容）"
+    context, sources = _retrieve_chunks(db, user_id, query_vec, req.document_id, req.top_k)
 
     # 2. 构建system_prompt
     system_prompt = f"""你是一位专业的医学知识助手。请基于用户的个人知识库内容回答问题。
@@ -744,44 +700,7 @@ def chat_stream(
 
     # 4. RAG检索相关知识（用改写后的query）
     query_vec = asset_embedder.embed_text(retrieval_query)
-    chunk_query = db.query(AssetChunk).filter(
-        AssetChunk.user_id == user_id,
-        AssetChunk.embedding != "",
-    )
-    if req.document_id:
-        chunk_query = chunk_query.filter(AssetChunk.document_id == req.document_id)
-
-    chunks = chunk_query.all()
-    context_parts = []
-    sources = []
-    if chunks:
-        chunk_scores = []
-        for chunk in chunks:
-            chunk_vec = asset_embedder.json_to_vector(chunk.embedding)
-            if not chunk_vec:
-                continue
-            score = asset_embedder.cosine_similarity(query_vec, chunk_vec)
-            chunk_scores.append((chunk, score))
-        chunk_scores.sort(key=lambda x: x[1], reverse=True)
-
-        # 批量查询文档（避免N+1查询）
-        top_chunks = chunk_scores[:req.top_k * 2]
-        doc_ids = list({c.document_id for c, _ in top_chunks})
-        doc_map = {d.id: d for d in db.query(AssetDocument).filter(AssetDocument.id.in_(doc_ids)).all()}
-
-        seen_docs = set()
-        for chunk, score in top_chunks:
-            doc = doc_map.get(chunk.document_id)
-            if not doc:
-                continue
-            context_parts.append(f"【{doc.title}】\n{chunk.content}")
-            if doc.id not in seen_docs:
-                seen_docs.add(doc.id)
-                sources.append({"id": doc.id, "title": doc.title, "score": float(score)})
-            if len(context_parts) >= req.top_k:
-                break
-
-    context = "\n\n".join(context_parts) if context_parts else "（知识库中未找到相关内容）"
+    context, sources = _retrieve_chunks(db, user_id, query_vec, req.document_id, req.top_k)
 
     # 5. 构建system_prompt
     system_prompt = f"""你是一位专业的医学知识助手。请基于用户的个人知识库内容回答问题。

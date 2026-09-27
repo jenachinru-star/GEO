@@ -1,7 +1,7 @@
-﻿import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { formatUtcTime } from '@/utils/time'
-import { Card, Button, Space, Typography, Tag, Spin, message, Tabs, Divider, Select, Input, Avatar, List, Popconfirm, Dropdown } from 'antd'
-import { ArrowLeftOutlined, RobotOutlined, SendOutlined, UserOutlined, ThunderboltOutlined, PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, DiffOutlined, DownloadOutlined, SyncOutlined } from '@ant-design/icons'
+import { Card, Button, Space, Typography, Tag, Spin, message, Tabs, Divider, Select, Input, Avatar, List, Popconfirm, Dropdown, Modal } from 'antd'
+import { ArrowLeftOutlined, RobotOutlined, SendOutlined, UserOutlined, ThunderboltOutlined, PlusOutlined, SearchOutlined, EditOutlined, DeleteOutlined, DiffOutlined, DownloadOutlined, SyncOutlined, ExpandOutlined } from '@ant-design/icons'
 import { useNavigate, useParams } from 'react-router-dom'
 import { assetApi } from '@/api/asset'
 import MindmapViewer from '@/components/MindmapViewer'
@@ -56,6 +56,7 @@ const AssetDetail = () => {
   const [compareModels, setCompareModels] = useState<string[]>([])
   const [compareResults, setCompareResults] = useState<any[]>([])
   const [refreshLoading, setRefreshLoading] = useState(false)
+  const [searchScope, setSearchScope] = useState<'current' | 'all'>('current')
 
   const fetchDetail = async () => {
     setLoading(true)
@@ -289,7 +290,7 @@ const AssetDetail = () => {
         },
         body: JSON.stringify({
           session_id: selectedSessionId,
-          document_id: detail?.document?.id,
+          document_id: searchScope === 'current' ? detail?.document?.id : undefined,
           message: question,
           platform: selectedModel,
           template: selectedTemplate,
@@ -379,7 +380,7 @@ const AssetDetail = () => {
       const res: any = await assetApi.compareChatModels({
         message: question,
         platforms: compareModels,
-        document_id: detail?.document?.id,
+        document_id: searchScope === 'current' ? detail?.document?.id : undefined,
       })
       setCompareResults(res.data.results || [])
     } catch (e) {
@@ -512,6 +513,21 @@ const AssetDetail = () => {
             >
               对比模式
             </Button>
+            <Select
+              value={searchScope}
+              onChange={(v: 'current' | 'all') => setSearchScope(v)}
+              style={{ width: 110 }}
+              options={[
+                { value: 'current', label: '当前文档' },
+                { value: 'all', label: '全部资产' },
+              ]}
+            />
+            <Button
+              size="small"
+              icon={<ExpandOutlined />}
+              onClick={() => navigate(`/chat?doc=${detail?.document?.id || ''}`)}
+              title="全屏对话"
+            />
           </Space>
           <Text type="secondary" style={{ fontSize: 12 }}>
             {showSessionSidebar ? (
@@ -560,7 +576,7 @@ const AssetDetail = () => {
             <div style={{ textAlign: 'center', padding: '60px 0', color: '#999' }}>
               <RobotOutlined style={{ fontSize: 48, marginBottom: 16, color: '#1677ff' }} />
               <p>开始和您的知识库对话吧</p>
-              <p style={{ fontSize: 13 }}>AI会基于本文档和您收藏的其他内容回答问题</p>
+              <p style={{ fontSize: 13 }}>{searchScope === 'current' ? 'AI会基于本文档内容回答问题' : 'AI会基于您收藏的全部内容回答问题'}</p>
             </div>
           )}
 
@@ -600,7 +616,7 @@ const AssetDetail = () => {
                     <Text type="secondary" style={{ fontSize: 12 }}>引用来源：</Text>
                     {msg.sources.map((s: any, i: number) => (
                       <Tag key={i} style={{ fontSize: 11, margin: '2px 2px 0 0' }}>
-                        {s.title}
+                        {s.title} ({s.score ? Math.round(s.score * 100) : 0}%)
                       </Tag>
                     ))}
                   </div>
