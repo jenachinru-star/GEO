@@ -26,6 +26,9 @@ const WechatArticleDetail = lazy(() => import('@/pages/WechatArticleDetail'))
 const UsageDashboard = lazy(() => import('@/pages/UsageDashboard'))
 const UsageGovernance = lazy(() => import('@/pages/UsageGovernance'))
 const AccountSettings = lazy(() => import('@/pages/AccountSettings'))
+const BenchmarkAccounts = lazy(() => import('@/pages/BenchmarkAccounts'))
+const CompetitorAnalysis = lazy(() => import('@/pages/CompetitorAnalysis'))
+const AuditLogs = lazy(() => import('@/pages/AuditLogs'))
 
 const RequireAuth = ({ children }: { children: React.ReactNode }) => {
   const { token } = useAppStore()
@@ -63,6 +66,9 @@ const AppRouter = () => {
           <Route path="usage" element={<RequireAuth><UsageDashboard /></RequireAuth>} />
           <Route path="usage-governance" element={<RequireAuth><UsageGovernance /></RequireAuth>} />
           <Route path="account" element={<RequireAuth><AccountSettings /></RequireAuth>} />
+          <Route path="benchmark-accounts" element={<RequireAuth><BenchmarkAccounts /></RequireAuth>} />
+          <Route path="competitor-analysis" element={<RequireAuth><CompetitorAnalysis /></RequireAuth>} />
+          <Route path="audit-logs" element={<RequireAuth><AuditLogs /></RequireAuth>} />
         </Route>
       </Routes>
     </Suspense>

@@ -37,6 +37,10 @@ from app.api.video import router as video_router
 from app.api.publish_account import router as publish_account_router
 from app.api.compliance import router as compliance_router
 
+# ===== 阶段四C =====
+from app.api.benchmark import router as benchmark_router
+from app.api.audit import router as audit_router
+
 __all__ = [
     "monitor_router",
     "content_router",
@@ -74,5 +78,8 @@ __all__ = [
     "video_router",
     "publish_account_router",
     "compliance_router",
+    # 阶段四C
+    "benchmark_router",
+    "audit_router",
 ]
 

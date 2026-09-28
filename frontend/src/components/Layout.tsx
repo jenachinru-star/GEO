@@ -19,7 +19,10 @@ import {
   AppstoreOutlined,
   SendOutlined,
   SafetyCertificateOutlined,
-  ThunderboltOutlined
+  ThunderboltOutlined,
+  BarChartOutlined,
+  FileSearchOutlined,
+  FundOutlined
 } from '@ant-design/icons'
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useAppStore } from '@/store/useStore'
@@ -42,11 +45,21 @@ const getAllMenuItems = () => [
       { key: '/published', label: '已发布列表' },
     ],
   },
+  {
+    key: 'content-ops-group',
+    icon: <FundOutlined />,
+    label: '内容运营',
+    children: [
+      { key: '/benchmark-accounts', label: '对标账号管理' },
+      { key: '/competitor-analysis', label: '竞品对比分析' },
+    ],
+  },
   { key: '/asset', icon: <BookOutlined />, label: '数字资产' },
   { key: '/chat', icon: <ThunderboltOutlined />, label: '智能问答' },
   { key: '/tasks', icon: <SyncOutlined />, label: '任务中心' },
   { key: '/usage', icon: <RobotOutlined />, label: '用量统计' },
   { key: '/usage-governance', icon: <SafetyCertificateOutlined />, label: '用量管理' },
+  { key: '/audit-logs', icon: <FileSearchOutlined />, label: '审计日志' },
   { key: '/settings', icon: <SettingOutlined />, label: '系统设置' },
 ]
 
@@ -55,8 +68,8 @@ const filterMenuByRole = (items: any[], role: string) => {
   if (role === "admin") {
     return items
   }
-  // 普通用户隐藏：用量统计（/usage）、系统设置（/settings）
-  const hiddenKeys = ['/usage', '/settings']
+  // 普通用户隐藏：用量统计（/usage）、系统设置（/settings）、审计日志（/audit-logs）
+  const hiddenKeys = ['/usage', '/settings', '/audit-logs']
   return items
     .map(item => {
       if (item.children) {

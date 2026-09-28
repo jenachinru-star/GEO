@@ -41,6 +41,11 @@ from app.models.wechat_stats import WechatAccountStats, WechatArticle, WechatArt
 # ===== 文章AI分析模块 =====
 from app.models.article_analysis import ArticleAnalysis
 
+# ===== 阶段四C：对标账号/审计日志/竞品分析 =====
+from app.models.benchmark_account import BenchmarkAccount, BenchmarkArticle
+from app.models.audit_log import AuditLog
+from app.models.competitor_analysis import CompetitorAnalysis
+
 __all__ = [
     "Platform",
     "Question",
@@ -79,4 +84,9 @@ __all__ = [
     "WechatArticleStats",
     # 文章AI分析模块
     "ArticleAnalysis",
+    # 阶段四C：对标账号/审计日志/竞品分析
+    "BenchmarkAccount",
+    "BenchmarkArticle",
+    "AuditLog",
+    "CompetitorAnalysis",
 ]

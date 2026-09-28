@@ -45,6 +45,8 @@ from app.api import (
     asset_tag_router,
     video_router,
     publish_account_router,
+    benchmark_router,
+    audit_router,
 )
 from app.api.usage_governance import router as usage_governance_router
 
@@ -283,6 +285,14 @@ app.add_middleware(
 from app.middleware.rate_limit import RateLimitMiddleware
 app.add_middleware(RateLimitMiddleware, requests_per_minute=120)
 
+# 阶段四C：审计日志中间件（先添加，在内层）
+from app.middleware.audit_middleware import AuditMiddleware
+app.add_middleware(AuditMiddleware)
+
+# 阶段四C：全局错误处理中间件（后添加，在外层，最先捕获异常）
+from app.middleware.error_handler import ErrorHandlerMiddleware
+app.add_middleware(ErrorHandlerMiddleware)
+
 
 # usage_context中间件：HTTP请求自动设置user_id，使LLM调用能进行配额检查
 @app.middleware("http")
@@ -348,6 +358,10 @@ app.include_router(asset_tag_router)
 app.include_router(video_router)
 app.include_router(publish_account_router)
 app.include_router(usage_governance_router)
+
+# 阶段四C路由
+app.include_router(benchmark_router)
+app.include_router(audit_router)
 
 
 @app.get("/", summary="健康检查")

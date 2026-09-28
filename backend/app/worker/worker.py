@@ -39,6 +39,7 @@ import app.worker.publish_tasks  # noqa: F401
 import app.worker.wechat_data_tasks  # noqa: F401
 import app.worker.article_analysis_tasks  # noqa: F401
 import app.worker.semantic_tasks  # noqa: F401
+import app.worker.competitor_analysis_tasks  # noqa: F401
 
 logging.basicConfig(
     level=logging.INFO,
@@ -70,6 +71,7 @@ TASK_TIMEOUT_BY_TYPE = {
     "wechat_data_collect": 300,  # 微信数据采集：5分钟
     "article_analysis": 300,     # 文章AI分析：5分钟
     "semantic_generate": 300,    # 医生资料语义生成：5分钟
+    "competitor_analysis": 300,  # 竞品对比AI分析：5分钟
 }
 TASK_TIMEOUT_DEFAULT = 600  # 默认超时时间
 CANCEL_GRACE_SECONDS = 300  # cancelling状态宽限期：超过此时间仍未终止则强制failed
