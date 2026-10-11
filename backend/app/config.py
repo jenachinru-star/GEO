@@ -95,7 +95,7 @@ class Settings(BaseSettings):
         "glm/glm-5.3-flash": {"input": 1.0, "output": 4.0},
         "minimax/MiniMax-M2.7-highspeed": {"input": 1.0, "output": 3.0},
         "doubao/ep-20260920202309-ss2fz": {"input": 23.0, "output": 48.0},
-        "deepseek/deepseek-chat": {"input": 1.0, "output": 2.0},
+        "deepseek/deepseek-flash": {"input": 1.0, "output": 2.0},
     }
 
     # Resend 邮件服务

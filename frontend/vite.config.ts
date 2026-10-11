@@ -15,12 +15,12 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/geo/api': {
-        target: 'http://10.17.197.113:8000/',
+        target: 'http://localhost:8000/',
         changeOrigin: true,
         rewrite: (p: string) => p.replace(/^\/geo/, '')
       },
       '/uploads': {
-        target: 'http://10.17.197.113:8000',
+        target: 'http://localhost:8000',
         changeOrigin: true
       }
     }
